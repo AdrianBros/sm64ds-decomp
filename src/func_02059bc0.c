@@ -1,0 +1,1 @@
+C:/Users/tango/Documents/sm64ds-decomp/match/auto/0x02059bc0.c
