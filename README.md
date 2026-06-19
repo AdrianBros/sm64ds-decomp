@@ -120,6 +120,23 @@ matching-decompilation toolchain on my machine. Do these in order:
 Use only my own legally dumped ROM. Never commit the ROM or anything extracted from it.
 ```
 
+**Claude effort and hit rate.** If you run batches of functions through a Claude agent
+fan-out, watch the **hit rate** (functions that verify divided by functions attempted).
+Early/fresh subsystems land 50% or more; as the easy functions in a region get matched,
+the rate falls. The Claude Code reasoning-effort setting matters here: higher effort
+converts more of the hard residue but costs more tokens per attempt. A rule of thumb once
+a batch's hit rate drops **below 25%**:
+
+- **Keep cracking as-is** if you don't mind the cost. It still lands real functions, but
+  most of the tokens go to attempts that fail, so it is inefficient.
+- **Raise the reasoning effort** (e.g. medium to high). On the hard residue this converts
+  noticeably more functions and is usually cheaper *per function actually landed*, even
+  though each attempt costs more.
+- **Hand-crack with the main Claude session.** When even high effort floors out, the
+  remaining functions are genuine one-off logic. Drop the fan-out and have the main
+  session match them one at a time (disassemble, write C, verify with `tools/match.py`),
+  or build a new template rule if you spot a recurring shape.
+
 ## Credits
 
 Symbol names and struct knowledge build on community reverse-engineering work. See
