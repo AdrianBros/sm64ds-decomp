@@ -1,3 +1,4 @@
+
 extern char G[];
 unsigned int _ZN3OAM12EnableSubOAMEv(void)
 {

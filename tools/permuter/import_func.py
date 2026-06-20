@@ -88,6 +88,37 @@ def to_win(p):
     return str(pathlib.Path(p).resolve()).replace("\\", "/")
 
 
+def setup_dir(found, base_src, out=None):
+    """Write a permuter working dir for `found` (mod,label,name,addr,size) seeded with
+    the C text `base_src`. Returns (out_path, name, addr, size, n_relocs)."""
+    mod, label, name, addr, size = found
+    data = mod["bin"].read_bytes()
+    tgt = data[addr - mod["base"]:addr - mod["base"] + size]
+
+    out = pathlib.Path(out) if out else (PERM_DIR / "work" / name)
+    out.mkdir(parents=True, exist_ok=True)
+
+    (out / "compile.sh").write_text(
+        f'#!/bin/bash\nexec "{to_posix(WRAPPER)}" "$@"\n')
+    (out / "compile.sh").chmod(0o755)
+    (out / "base.c").write_text(base_src)
+    (out / "target.o").write_bytes(tgt)
+
+    # Reloc offsets to wildcard: prefer the seed's own .rel.text (authoritative, incl.
+    # data-pool relocs), fall back to config relocs.txt if the seed won't compile.
+    reloc_offs = candidate_reloc_offsets(out / "base.c")
+    if reloc_offs is None:
+        relocs = R.load_relocs_file(mod["relocs"])
+        reloc_offs = sorted(o - addr for o in relocs if addr <= o < addr + size)
+    (out / "target.o.relocs").write_text("".join(f"0x{o:x}\n" for o in reloc_offs))
+
+    (out / "settings.toml").write_text(
+        f'compiler_type = "mwcc"\n'
+        f'func_name = "{name}"\n'
+        f'objdump_command = "python {to_win(CAP)}"\n')
+    return out, name, addr, size, len(reloc_offs)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--module", default=None)
@@ -103,41 +134,11 @@ def main():
     if not found:
         print("function not found", file=sys.stderr)
         sys.exit(1)
-    mod, label, name, addr, size = found
-
-    data = mod["bin"].read_bytes()
-    tgt = data[addr - mod["base"]:addr - mod["base"] + size]
-
-    out = pathlib.Path(args.out) if args.out else (PERM_DIR / "work" / name)
-    out.mkdir(parents=True, exist_ok=True)
-
-    (out / "compile.sh").write_text(
-        f'#!/bin/bash\nexec "{to_posix(WRAPPER)}" "$@"\n')
-    (out / "compile.sh").chmod(0o755)
-
-    if args.base:
-        (out / "base.c").write_text(pathlib.Path(args.base).read_text())
-    elif not (out / "base.c").exists():
-        (out / "base.c").write_text(
-            f"// seed: replace with a logically-correct draft of {name}\n"
-            f"void {name}(void) {{}}\n")
-
-    (out / "target.o").write_bytes(tgt)
-    # Reloc offsets to wildcard: prefer the seed's own .rel.text (authoritative, incl.
-    # data-pool relocs), fall back to config relocs.txt if the seed won't compile.
-    reloc_offs = candidate_reloc_offsets(out / "base.c")
-    if reloc_offs is None:
-        relocs = R.load_relocs_file(mod["relocs"])
-        reloc_offs = sorted(o - addr for o in relocs if addr <= o < addr + size)
-    (out / "target.o.relocs").write_text("".join(f"0x{o:x}\n" for o in reloc_offs))
-
-    (out / "settings.toml").write_text(
-        f'compiler_type = "mwcc"\n'
-        f'func_name = "{name}"\n'
-        f'objdump_command = "python {to_win(CAP)}"\n')
-
-    print(f"imported {label} {name} @ 0x{addr:08x} (size 0x{size:x}, "
-          f"{len(reloc_offs)} relocs) -> {out}")
+    label = found[1]
+    base_src = (pathlib.Path(args.base).read_text() if args.base
+                else f"// seed: replace with a draft of {found[2]}\nvoid {found[2]}(void) {{}}\n")
+    out, name, addr, size, nrel = setup_dir(found, base_src, args.out)
+    print(f"imported {label} {name} @ 0x{addr:08x} (size 0x{size:x}, {nrel} relocs) -> {out}")
     print(f"run: python {to_posix(PERM_DIR / 'permuter.py')} "
           f"{to_posix(out)} --stop-on-zero -j 4")
 

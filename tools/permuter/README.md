@@ -38,9 +38,20 @@ End-to-end pipeline runs on our mwccarm toolchain, native Windows, no external o
   compile.sh, base.c, and settings.toml. **PROVEN: cracked a real unmatched function** --
   `OAM::EnableSubOAM` (0x020219f0), base score 20 -> 0, the permuter found `G[0]=(long)0`
   (the cast shifts regalloc to match the ROM), independently oracle-verified and banked.
-- [ ] **LLM <-> permuter loop** (next): run the permuter as a BACKGROUND job that only
-  reports back on a perfect match (score 0). Do NOT feed half-mutated candidates to the
-  LLM -- that causes the "doom loop / token burn" others have reported.
+- [x] **Batch runner** (`batch.py`): sweeps a pile of functions through the permuter and
+  auto-banks every oracle-verified score-0. Two seed sources:
+  - `--module/--max`: auto-find template-regperm functions (free). NOTE: this pile is
+    **currently exhausted** -- the strict templates already take what they can and we
+    cleared the regperm residue, so 0 remain at <=0x140. Kept for when new templates land.
+  - `--seeds FILE`: a JSONL of near-misses `{name|module+addr, c_source}` from ANY source.
+    **This is the real fuel.** A draft that compiles but doesn't match is often only
+    coloring/ordering blocked -- exactly what the permuter finishes. Validated end to end
+    (loaded a seed, permuted, cracked, oracle-verified, banked).
+- [ ] **LLM <-> permuter loop** (next): wire the fan-out to emit its near-misses (the ~92%
+  of drafts that compile but don't match, which it currently discards) to a JSONL, then
+  `batch.py --seeds` permutes them -- turning fan-out misses into matches for free. Run the
+  permuter as a BACKGROUND job that only reports a perfect match; never feed half-mutated
+  candidates back to the LLM (causes the "doom loop / token burn" others report).
 
 ## Setup (reproducing on a fresh clone)
 
