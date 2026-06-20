@@ -21,10 +21,12 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import swarm as S
+import triage
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 SRC = REPO / "src"
 LEDGER = REPO / "progress" / "matched.jsonl"
+NEARMISS = REPO / "progress" / "nearmiss.jsonl"
 
 
 def load_wins(result_path):
@@ -33,6 +35,12 @@ def load_wins(result_path):
     if wins is None and isinstance(obj, list):
         wins = obj
     return wins or []
+
+
+def load_near_misses(result_path):
+    o = json.loads(pathlib.Path(result_path).read_text())
+    o = o.get("result", o)
+    return o.get("nearMisses") or o.get("near_misses") or []
 
 
 def load_meta(worklist_path):
@@ -80,6 +88,7 @@ def main():
         print("(dry-run: nothing banked)")
         return
 
+    banked_names = {p[0] for p in passed}
     for name, addr, size, mod, src in passed:
         ext = "cpp" if src.startswith("//cpp") else "c"
         (SRC / f"{name}.{ext}").write_text(src if src.endswith("\n") else src + "\n")
@@ -87,6 +96,43 @@ def main():
             f.write(json.dumps({"addr": f"0x{addr:08x}", "name": name, "size": size,
                                 "module": mod, "versions": ["agent-llm"]}) + "\n")
     print(f"banked {len(passed)}")
+
+    # Near-misses: the agents' closest COMPILING attempts that did not byte-match.
+    # Keep the ones that genuinely compile and don't already match, and write them as
+    # permuter seeds (tools/permuter/batch.py --seeds) -- the permuter finishes the
+    # coloring/ordering for free. (If a "near-miss" actually matches, bank it as a bonus.)
+    near = load_near_misses(args.result)
+    seeds, bonus = [], 0
+    for nm in near:
+        name, src = nm.get("name"), nm.get("c_source")
+        if not name or not src or name not in meta or name in banked_names:
+            continue
+        addr, size, mod, tb = meta[name]
+        try:
+            if S.oracle_ok(src, name, tb):           # actually a match the agent under-reported
+                ext = "cpp" if src.startswith("//cpp") else "c"
+                (SRC / f"{name}.{ext}").write_text(src if src.endswith("\n") else src + "\n")
+                with LEDGER.open("a") as f:
+                    f.write(json.dumps({"addr": f"0x{addr:08x}", "name": name,
+                                        "size": size, "module": mod,
+                                        "versions": ["agent-llm"]}) + "\n")
+                banked_names.add(name)
+                bonus += 1
+                continue
+            code, _ = triage.compile_candidate(src, name)   # keep only if it compiles
+            if code is None:
+                continue
+        except Exception:
+            continue
+        seeds.append({"module": mod, "addr": f"0x{addr:08x}", "name": name,
+                      "size": size, "c_source": src})
+    if bonus:
+        print(f"banked {bonus} extra from near-misses that actually matched")
+    if near:
+        NEARMISS.write_text("".join(json.dumps(s) + "\n" for s in seeds))
+        print(f"near-misses: {len(near)} returned, {len(seeds)} compiling seeds -> {NEARMISS.name}")
+        if seeds:
+            print(f"  permute them: python tools/permuter/batch.py --seeds {NEARMISS} --secs 120")
 
 
 if __name__ == "__main__":

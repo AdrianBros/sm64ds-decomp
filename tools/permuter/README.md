@@ -47,11 +47,19 @@ End-to-end pipeline runs on our mwccarm toolchain, native Windows, no external o
     **This is the real fuel.** A draft that compiles but doesn't match is often only
     coloring/ordering blocked -- exactly what the permuter finishes. Validated end to end
     (loaded a seed, permuted, cracked, oracle-verified, banked).
-- [ ] **LLM <-> permuter loop** (next): wire the fan-out to emit its near-misses (the ~92%
-  of drafts that compile but don't match, which it currently discards) to a JSONL, then
-  `batch.py --seeds` permutes them -- turning fan-out misses into matches for free. Run the
-  permuter as a BACKGROUND job that only reports a perfect match; never feed half-mutated
-  candidates back to the LLM (causes the "doom loop / token burn" others report).
+- [x] **LLM -> permuter loop** (WIRED 2026-06-20): the fan-out now recovers its own misses.
+  1. The crack-worklist fan-out agents return a `near_misses` array (their closest attempt
+     that COMPILES but didn't byte-match) alongside verified `wins`.
+  2. `tools/bank.py` extracts them: drops non-compiling ones, banks any that actually match
+     (agent under-reported), and writes the rest as seeds to `progress/nearmiss.jsonl`.
+  3. `python tools/permuter/batch.py --seeds progress/nearmiss.jsonl --secs 120` permutes
+     each and auto-banks the oracle-verified score-0 matches.
+  Net: a draft that "compiles but misses" (correct logic, wrong register coloring) is no
+  longer thrown away -- the permuter finishes it for free. Each fan-out batch's ~92% miss
+  pile becomes permuter fuel. Validated piece by piece (near-miss extraction + --seeds crack);
+  a live fan-out run exercises the agent-emits-near_misses step end to end.
+  NOTE: keep the permuter a one-way consumer of near-misses; never feed its half-mutated
+  intermediates back to the LLM (causes the "doom loop / token burn" others report).
 
 ## Setup (reproducing on a fresh clone)
 
