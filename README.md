@@ -147,6 +147,8 @@ ROM.
 Function contributions: [RyanCopley](https://github.com/RyanCopley) hand-matched a set of
 functions across ov002, ov006, arm9, and ov034 (PR #1), including the first functions in
 ov034 and several that had resisted the automated passes.
+[andrewboudreau](https://github.com/andrewboudreau) hand-matched 9 functions across arm9,
+ov002, ov006, and ov007 (PR #2).
 
 Tooling contributions: [webheadvr](https://github.com/webheadvr) made the relocation
 symbol resolver module-aware, fixing wrong-overlay symbol picks where overlay address

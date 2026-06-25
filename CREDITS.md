@@ -20,6 +20,11 @@ If you contribute, keep this separation: import knowledge, write code.
   set of functions across ov002, ov006, arm9, and ov034 (PR #1). 22 of these were ones not
   yet matched here, including the first two functions in ov034 and several that had resisted
   our automated passes; all were independently re-verified byte-for-byte before landing.
+- **Andrew Boudreau** (https://github.com/andrewboudreau) - hand-wrote and verified matching C
+  for 9 functions across arm9, ov002, ov006, and ov007 (PR #2). These are reloc tail-call,
+  guard-return, and call-forwarding shapes the automated passes deliberately skip; all were
+  independently re-verified byte-for-byte, identical across the 1.2 base/sp2/sp2p3 trio, before
+  landing.
 
 ## Tooling contributions
 - **webheadvr** (https://github.com/webheadvr) - made the relocation symbol resolver
