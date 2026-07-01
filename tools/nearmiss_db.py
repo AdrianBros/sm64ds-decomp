@@ -233,6 +233,29 @@ def export_close(args):
     db = load_db()
     out = [r for r in db.values()
            if r.get("divergences") is not None and 0 < r["divergences"] <= args.max_div]
+    if args.category:
+        # category-routed export (permuter wants "register allocation" / "instruction
+        # reorder"); uses the classification cache refine_wl.py maintains, classifying
+        # on demand for uncached entries.
+        import categorize_misses as CAT
+        cachep = REPO / "progress" / "nm_categories.json"
+        cache = json.loads(cachep.read_text()) if cachep.exists() else {}
+        want = {c.strip().lower() for c in args.category.split(",")}
+        kept = []
+        for r in out:
+            key = f"{r['module']}:{r['addr']}:{r['divergences']}"
+            cat = cache.get(key)
+            if cat is None:
+                try:
+                    cat = CAT.classify_entry(r["c_source"], r["name"],
+                                             bytes.fromhex(r["target_hex"]))
+                except Exception:
+                    cat = "error"
+                cache[key] = cat
+            if any(w in cat.lower() for w in want):
+                kept.append(r)
+        cachep.write_text(json.dumps(cache))
+        out = kept
     out.sort(key=lambda r: r["divergences"])
     pathlib.Path(args.out).write_text(
         "".join(json.dumps({"module": r["module"], "addr": r["addr"], "name": r["name"],
@@ -269,7 +292,11 @@ def main():
     p = sub.add_parser("stats"); p.set_defaults(fn=stats)
     p = sub.add_parser("list"); p.add_argument("--max-div", type=int); p.set_defaults(fn=_list)
     p = sub.add_parser("export-close"); p.add_argument("--max-div", type=int, default=8)
-    p.add_argument("--out", default="progress/close.jsonl"); p.set_defaults(fn=export_close)
+    p.add_argument("--out", default="progress/close.jsonl")
+    p.add_argument("--category", default=None,
+                   help="comma list of category substrings to keep (e.g. "
+                        "'register allocation,instruction reorder' for permuter seeds)")
+    p.set_defaults(fn=export_close)
     p = sub.add_parser("bank-matches"); p.set_defaults(fn=bank_matches)
     args = ap.parse_args()
     args.fn(args)
