@@ -69,6 +69,15 @@ per draft (progress/refine_attempted.txt); improved drafts flow back into the DB
 permuter / hand-fix tiers. Do NOT run refine on a fresh fan-out's leftovers - measured
 zero lift there (high-effort fan-out already captures what refine would).
 
+**Refine ONLY the head of the backlog.** Measured 2026-07-01, back-to-back same model:
+batch 1 (the 16 closest, mostly div 1-4) = 5/16 (31%) at ~107K/landed; batch 2 (the next
+20, deeper into div 4-6) = 1/20 (5%) at ~660K/landed - the heuristic categorizer mislabels
+floor residuals as structural, and past the head the pool is floor-dominated (agents
+confirmed: two-word batching, scheduler ordering, materialization, tail-merge epilogues).
+So: run ONE refine batch on the closest drafts after fresh batches replenish the DB, then
+stop - depth does not pay. The consolation prize of a deep batch is diagnosis: misses come
+back floor-labeled and several drafts get improved in place.
+
 ## Pragmas tested, dead end (2026-07-01)
 
 mwccarm 1.2 accepts `#pragma scheduling off` / `#pragma peephole off` silently and they
