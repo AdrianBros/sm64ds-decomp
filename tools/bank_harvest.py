@@ -3,37 +3,27 @@ INDEPENDENTLY re-verifies each via the oracle (never trusts agent say-so), and b
 real byte-matches to src/<name>.c(pp) + progress/matched.jsonl (tag 'harvest'). Resilient
 to agents that died mid-run -- it banks whatever verified lines they saved.
 
+Dry-run by default; pass --apply to bank.
+
 Usage:
-  python tools/bank_harvest.py --glob "C:/tmp/h3_*.jsonl"
-  python tools/bank_harvest.py --glob "C:/tmp/h*_*.jsonl" --dry-run
+  python tools/bank_harvest.py --glob "C:/tmp/h3_*.jsonl"           # verify only
+  python tools/bank_harvest.py --glob "C:/tmp/h*_*.jsonl" --apply   # verify + bank
 """
 import argparse, json, glob, pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import swarm as S
 import nearmiss_db as NM
-
-REPO = pathlib.Path(__file__).resolve().parent.parent
-SRC = REPO / "src"
-LEDGER = REPO / "progress" / "matched.jsonl"
-NONMATCH = REPO / "progress" / "nonmatching.jsonl"
-
-
-def done_set():
-    d = set()
-    for f in (LEDGER, NONMATCH):
-        if f.exists():
-            for l in f.read_text().splitlines():
-                if l.strip():
-                    r = json.loads(l)
-                    d.add((r["module"], r["addr"]))
-    return d
+import ledger as L
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--glob", required=True, help="glob for agent result files")
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--apply", action="store_true", help="bank the verified matches")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="no-op; dry-run is the default (kept for compatibility)")
     args = ap.parse_args()
+    do_apply = args.apply and not args.dry_run
 
     cands = {}
     for fp in glob.glob(args.glob):
@@ -49,14 +39,14 @@ def main():
                 cands[r["name"]] = r["c_source"]   # ranges disjoint; last wins on dup name
     print(f"collected {len(cands)} candidates from {args.glob}")
 
-    done = done_set()
+    done = L.load_done()
     banked, rejected, dup = [], [], 0
     for name, src in cands.items():
         info = NM.resolve_name(name)
         if not info:
             rejected.append((name, "resolve")); continue
         addr, size, module, thex = info
-        if (module, addr) in done:
+        if L.make_key(module, addr) in done:
             dup += 1; continue
         try:
             ok = S.oracle_ok(src, name, bytes.fromhex(thex))
@@ -64,19 +54,22 @@ def main():
             rejected.append((name, f"exc {e}")); continue
         if not ok:
             rejected.append((name, "oracle FALSE")); continue
-        if not args.dry_run:
-            ext = "cpp" if src.startswith("//cpp") else "c"
-            (SRC / f"{name}.{ext}").write_text(src if src.endswith("\n") else src + "\n")
-            with LEDGER.open("a") as f:
-                f.write(json.dumps({"addr": addr, "name": name, "size": size,
-                                    "module": module, "versions": ["harvest"]}) + "\n")
-        done.add((module, addr))
+        if do_apply:
+            status = L.bank({"addr": addr, "name": name, "size": size,
+                             "module": module, "versions": ["harvest"]}, src)
+            if status == "dup":                    # a concurrent banker landed it
+                dup += 1; continue
+            if status == "refused":
+                rejected.append((name, "ledger refused (see stderr)")); continue
+        done.add(L.make_key(module, addr))
         banked.append(name)
 
-    verb = "WOULD BANK" if args.dry_run else "BANKED"
+    verb = "BANKED" if do_apply else "WOULD BANK"
     print(f"{verb} {len(banked)} (independently verified); dup-skipped {dup}; rejected {len(rejected)}")
     for n, why in rejected[:20]:
         print(f"   reject: {n}: {why}")
+    if not do_apply and banked:
+        print("(dry-run: re-run with --apply to bank)")
 
 
 if __name__ == "__main__":

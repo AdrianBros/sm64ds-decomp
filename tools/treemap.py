@@ -7,8 +7,8 @@ labeled with the module name and its matched byte percentage.
 
 Data comes straight from the existing pipeline helpers so the classification is
 identical to the real matcher:
-    sweep.funcs(mod)  -> arm-mode (name, addr, size) inside the module image
-    sweep.load_done() -> set of (module_label, addr) that are matched
+    sweep.funcs(mod)      -> arm-mode (name, addr, size) inside the module image
+    ledger.matched_set()  -> set of (module_label, addr) that are matched
 
 Output is a single self-contained HTML file with no external dependencies, so
 it opens offline by double-click. The squarified layout is computed here in
@@ -26,6 +26,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import modules as MOD
 import sweep as SW
+import ledger as L
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
@@ -339,7 +340,7 @@ def main():
                     help="also emit a standalone static SVG (for the README image)")
     args = ap.parse_args()
 
-    GATHER_DONE = SW.load_done()
+    GATHER_DONE = L.matched_set()        # green = byte-exact matches ONLY
     mods = gather()
     out_path = pathlib.Path(args.out)
     rc, dn, tn, db, tb, fp, bp = render(mods, out_path)

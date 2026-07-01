@@ -18,7 +18,6 @@ Usage:
 """
 import argparse
 import io
-import json
 import pathlib
 import re
 import sys
@@ -29,12 +28,12 @@ from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import match as M  # reuse compile_c / extract_func / compare / target_bytes
 import relocs as R  # resolve call targets / globals to symbol names
+import ledger as L
 
 REPO = M.REPO
 SYMS = REPO / "config" / "arm9" / "symbols.txt"
 ARM9 = M.ARM9
 BASE = M.ARM9_BASE
-MATCHED = REPO / "progress" / "matched.jsonl"
 
 md = Cs(CS_ARCH_ARM, CS_MODE_ARM)
 
@@ -44,25 +43,10 @@ LINE_RE = re.compile(
 
 
 # ----------------------------------------------------------------------------- targets
-def load_done():
-    """(module, addr) pairs from the ledger. Keyed like sweep.load_done - overlays
-    share address space, so an addr-only set is a cross-module trap."""
-    done = set()
-    if MATCHED.is_file():
-        for line in MATCHED.read_text(errors="ignore").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                o = json.loads(line)
-                done.add((o.get("module", "arm9"), int(o["addr"], 0)))
-            except Exception:
-                pass
-    return done
-
-
 def enumerate_targets(lo_size, hi_size, mode, count):
-    done = load_done()
+    # keyed (module, addr) like every ledger consumer -- overlays share address
+    # space, so an addr-only set is a cross-module trap
+    done = L.load_done()
     limit = BASE + ARM9.stat().st_size
     out = []
     for line in SYMS.read_text(errors="ignore").splitlines():
@@ -1871,18 +1855,11 @@ def main():
 
     written_src = 0
     if args.apply and wins:
-        src_dir = REPO / "src"
-        with MATCHED.open("a") as f:
-            for t, label, c_source in wins:
-                f.write(json.dumps({
-                    "addr": f"0x{t['addr']:08x}", "name": t["name"],
-                    "size": t["size"], "module": "arm9",
-                    "versions": [f"template:{label}"],
-                }) + "\n")
-                cpath = src_dir / f"{t['name']}.c"
-                if not cpath.exists():
-                    cpath.write_text(pretty(c_source))
-                    written_src += 1
+        for t, label, c_source in wins:
+            if L.bank({"addr": t["addr"], "name": t["name"], "size": t["size"],
+                       "module": "arm9", "versions": [f"template:{label}"]},
+                      pretty(c_source)) == "banked":
+                written_src += 1
 
     print("=" * 52)
     matched = len(wins)
@@ -1891,7 +1868,7 @@ def main():
     for label in sorted(stats, key=lambda k: -stats[k]):
         print(f"  {stats[label]:5}  {label}")
     if args.apply:
-        print(f"\napplied: appended {matched} to matched.jsonl, wrote {written_src} src/*.c")
+        print(f"\napplied: banked {written_src}/{matched} to matched.jsonl + src/*.c")
     elif matched:
         print("\n(dry-run: re-run with --apply to record these in matched.jsonl)")
 

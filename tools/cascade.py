@@ -278,16 +278,13 @@ def main():
 
     written = 0
     if args.apply and wins:
-        src_dir = M.REPO / "src"
-        with S.MATCHED.open("a") as f:
-            for t, c_source in wins:
-                f.write(json.dumps({
-                    "addr": f"0x{t['addr']:08x}", "name": t["name"], "size": t["size"],
-                    "module": "arm9", "versions": [f"haiku:{args.model}"]}) + "\n")
-                cpath = src_dir / f"{t['name']}.c"
-                if not cpath.exists():
-                    cpath.write_text(S.pretty(c_source) if " { " in c_source else c_source + "\n")
-                    written += 1
+        import ledger as L
+        for t, c_source in wins:
+            body = S.pretty(c_source) if " { " in c_source else c_source
+            if L.bank({"addr": t["addr"], "name": t["name"], "size": t["size"],
+                       "module": "arm9", "versions": [f"haiku:{args.model}"]},
+                      body) == "banked":
+                written += 1
 
     print("\n" + "=" * 52)
     matched = len(wins)
@@ -298,7 +295,7 @@ def main():
     if matched:
         print(f"per match:  ~{total_in // matched} input tok  +  {tok['out'] // matched} output tok")
     if args.apply:
-        print(f"applied: {matched} to matched.jsonl, wrote {written} src/*.c")
+        print(f"applied: banked {written}/{matched} to matched.jsonl + src/*.c")
     elif matched:
         print("\n(dry-run: re-run with --apply to record)")
 

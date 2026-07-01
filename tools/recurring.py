@@ -13,7 +13,6 @@ Usage:
 """
 import argparse
 import collections
-import json
 import pathlib
 import sys
 
@@ -21,9 +20,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import swarm as S
 import modules as MOD
 import sweep
+import ledger as L
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-LEDGER = REPO / "progress" / "matched.jsonl"
 SRC = REPO / "src"
 
 
@@ -44,12 +43,9 @@ def main():
     by_label = {("arm9" if m["name"] == "main" else m["name"]): m for m in MOD.modules()}
     # which (module,addr) were matched by the LLM tier
     agent_keys = set()
-    for line in LEDGER.read_text(errors="ignore").splitlines():
-        if not line.strip():
-            continue
-        o = json.loads(line)
+    for o in L.read_records(L.MATCHED):
         if "agent-llm" in o.get("versions", []):
-            agent_keys.add((o.get("module", "arm9"), int(o["addr"], 0)))
+            agent_keys.add(L.key_of(o))
 
     # shapes the LLM cracked, with a src example
     agent_shapes = {}
@@ -65,7 +61,7 @@ def main():
                 break
 
     # count unmatched functions sharing each of those shapes (across ALL modules)
-    done = sweep.load_done()
+    done = L.load_done()
     unmatched = collections.Counter()
     fresh = collections.Counter()      # unmatched siblings outside arm9 (fresh modules)
     for mod in MOD.modules():

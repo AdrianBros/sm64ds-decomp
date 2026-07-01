@@ -7,6 +7,8 @@ Then run the free post-pass:  python tools/clone.py && python tools/paramclone.p
 """
 import argparse, json, pathlib, subprocess, sys, tempfile
 REPO = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "tools"))
+import ledger as L
 
 
 def find_result(x):
@@ -46,7 +48,7 @@ def main():
         for n, s in res["sources"].items():
             f.write(json.dumps({"name": n, "c_source": s}) + "\n")
     subprocess.run([sys.executable, str(REPO / "tools" / "bank_harvest.py"),
-                    "--glob", str(tmp)], check=True)
+                    "--glob", str(tmp), "--apply"], check=True)
 
     # link gate: the oracle wildcards reloc slots, so a candidate calling a wrong
     # same-shaped callee still byte-"matches". linkcheck reconstructs the linked
@@ -70,21 +72,19 @@ def main():
         # merely failed this run (never compiled, timed out, wild draft) must fall back
         # into the pool for a future batch/model instead.
         parked = skipped = 0
-        nm = REPO / "progress" / "nonmatching.jsonl"
-        with nm.open("a", encoding="utf-8") as f:
-            for n in miss:
-                r = rows.get(n)
-                d = divs.get(n)
-                if not r:
-                    continue
-                if d is None or not (0 < d <= 12):
-                    skipped += 1
-                    continue
-                f.write(json.dumps({"addr": r["addr"], "name": n,
-                                    "size": int(r["size"], 16), "module": r["module"],
-                                    "divergences": d,
-                                    "reason": f"fan-out miss ({res.get('model','?')} {res.get('tokensPerLanded')}/landed)"}) + "\n")
-                parked += 1
+        for n in miss:
+            r = rows.get(n)
+            d = divs.get(n)
+            if not r:
+                continue
+            if d is None or not (0 < d <= 12):
+                skipped += 1
+                continue
+            parked += L.append_nonmatching(
+                {"addr": r["addr"], "name": n, "size": int(r["size"], 16),
+                 "module": r["module"], "divergences": d,
+                 "reason": f"fan-out miss ({res.get('model','?')} "
+                           f"{res.get('tokensPerLanded')}/landed)"})
         print(f"parked {parked} close misses -> progress/nonmatching.jsonl; "
               f"{skipped} far/non-compiling misses left in the pool")
 

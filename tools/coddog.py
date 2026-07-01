@@ -31,6 +31,7 @@ import modules as MOD
 import sweep
 import knowledge as KB
 import worklist as WL
+import ledger as L
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
@@ -47,21 +48,12 @@ def load_parked():
     """(module, addr) pairs to keep out of the target pool: NONMATCHING floor and the
     near-miss backlog. nearmiss/db.jsonl is committed (shared); nonmatching.jsonl is
     local -- both are used if present."""
-    parked = set()
-    files = [REPO / "progress" / "nonmatching.jsonl", REPO / "nearmiss" / "db.jsonl"]
-    for p in files:
-        if not p.is_file():
-            continue
-        for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
-            if not line.strip():
-                continue
-            try:
-                r = json.loads(line)
-                a = r["addr"]
-                a = int(a, 0) if isinstance(a, str) else a
-                parked.add((r.get("module", "arm9"), a))
-            except Exception:
-                pass
+    parked = L.nonmatching_set()
+    for r in L.read_records(REPO / "nearmiss" / "db.jsonl"):
+        try:
+            parked.add(L.key_of(r))
+        except Exception:
+            pass
     return parked
 
 

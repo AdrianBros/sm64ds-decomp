@@ -33,6 +33,7 @@ import match as M
 import relocs as R
 import modules as MOD
 import sweep
+import ledger as L
 
 ALIAS = {"sb": "r9", "sl": "r10", "fp": "r11", "ip": "r12", "sp": "r13", "lr": "r14", "pc": "r15"}
 FIXED = {"r13", "r14", "r15"}                       # sp / lr / pc never get permuted
@@ -118,7 +119,7 @@ def main():
     ap.add_argument("--max", type=lambda x: int(x, 0), default=0x200)
     args = ap.parse_args()
 
-    done = sweep.load_done()
+    done = L.load_done()
     gsyms = R.load_all_syms()
     tiers = collections.Counter()
     regperm_by_rule = collections.Counter()

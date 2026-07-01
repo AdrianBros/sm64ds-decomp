@@ -269,9 +269,10 @@ Both classes live in nearmiss/db.jsonl at div 1-2; candidates for an asm-block c
 
 ## 7. Workflow implications
 
-- **Free tiers first, every cycle:** `clone.py` (byte-identical retarget) then `paramclone.py`
-  (same skeleton, substituted immediates) - they harvest the families each new match unlocks
-  for $0. Then `sweep.py` applies the templates above across all modules.
+- **Free tiers first, every cycle:** `clone.py --apply` (byte-identical retarget) then
+  `paramclone.py --apply` (same skeleton, substituted immediates) - they harvest the families
+  each new match unlocks for $0 (dry-run without `--apply`, like every banking tool). Then
+  `sweep.py --apply` applies the templates above across all modules.
 - **One representative -> a template.** When you hand-crack a function that clearly recurs,
   add a rule to `swarm.py` and `sweep.py --apply` clears the cluster for free. That is how the
   whole template tier was built and it's the cheapest way to lower difficulty in bulk.

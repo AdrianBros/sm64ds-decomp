@@ -90,8 +90,8 @@ def land(a):
     if a.refine:
         bank.append("--no-park")
     run("bank_run.py", *bank, check=False)
-    run("clone.py", check=False)
-    run("paramclone.py", check=False)
+    run("clone.py", "--apply", check=False)      # free tiers are dry-run by default
+    run("paramclone.py", "--apply", check=False)
     if not a.refine:
         try:
             sys.path.insert(0, str(TOOLS))

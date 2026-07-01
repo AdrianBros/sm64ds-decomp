@@ -22,6 +22,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 import categorize_misses as CAT
 import knowledge as KB
+import ledger as L
 import modules as MOD
 import relocs as R
 import worklist as WL
@@ -50,15 +51,7 @@ def main():
         r["addr"] = int(r["addr"], 0) if isinstance(r["addr"], str) else r["addr"]
         r["size"] = int(r["size"], 0) if isinstance(r["size"], str) else r["size"]
 
-    parked = set()
-    nmfile = REPO / "progress" / "nonmatching.jsonl"
-    if nmfile.exists():
-        for l in nmfile.read_text(encoding="utf-8").splitlines():
-            if l.strip():
-                r = json.loads(l)
-                a = r["addr"]
-                parked.add((r.get("module", "arm9"),
-                            int(a, 0) if isinstance(a, str) else a))
+    parked = L.nonmatching_set()
     attempted = set()
     if ATTEMPTED.exists():
         attempted = {l.strip() for l in ATTEMPTED.read_text().splitlines() if l.strip()}

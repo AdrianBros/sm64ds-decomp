@@ -44,9 +44,7 @@ import relocs as R
 import sweep
 import triage
 import import_func as IMP
-
-SRC = REPO / "src"
-LEDGER = REPO / "progress" / "matched.jsonl"
+import ledger as L
 
 
 def regperm_seed(name, ins, tgt, addr, relocs, syms):
@@ -71,7 +69,7 @@ def regperm_seed(name, ins, tgt, addr, relocs, syms):
 
 def find_regperm(module, maxsize, limit_scan):
     """Yield (mod, label, name, addr, size, tgt, seed_src) for regperm functions."""
-    done = sweep.load_done()
+    done = L.load_done()
     syms = R.load_all_syms()
     found = []
     for mod in MOD.modules():
@@ -130,14 +128,6 @@ def run_permuter(out, secs):
     return None
 
 
-def bank(label, name, addr, size, src):
-    (SRC / f"{name}.c").write_text(src)
-    rec = {"addr": f"0x{addr:08x}", "name": name, "size": size,
-           "module": label, "versions": ["permuter"]}
-    with open(LEDGER, "a") as f:
-        f.write(json.dumps(rec) + "\n")
-
-
 def load_seeds(path):
     """Read a near-miss JSONL into the same tuple shape as find_regperm."""
     pile = []
@@ -190,7 +180,8 @@ def main():
             print("  no score-0 found in budget")
             continue
         if S.oracle_ok(src, name, tgt):
-            bank(label, name, addr, size, src)
+            L.bank({"addr": addr, "name": name, "size": size,
+                    "module": label, "versions": ["permuter"]}, src)
             banked += 1
             print(f"  CRACKED + oracle-verified -> banked {name}")
         else:

@@ -23,6 +23,7 @@ sys.path.insert(0, str(REPO / "tools"))
 sys.path.insert(0, str(REPO / "tools" / "permuter"))
 import import_func as IMP
 import nearmiss_db as DB
+import ledger as L
 
 
 def best_output(work):
@@ -40,8 +41,8 @@ def best_output(work):
 
 def run_one(rec, secs, jobs):
     """Permute one DB record. Returns 'banked' | 'improved' | 'nochange'.
-    All DB/ledger writes happen under the cross-process lock (DB.locked)."""
-    import json
+    Ledger writes go through ledger.bank (its own lock + under-lock dup check);
+    DB writes happen under the DB lock (DB.locked)."""
     a = rec["addr"]
     found = IMP.find_func(rec["module"], int(a, 0) if isinstance(a, str) else a, rec["name"])
     if not found:
@@ -73,13 +74,12 @@ def run_one(rec, secs, jobs):
     score, src = bo
     div, ok = DB.evaluate(src, name, bytes.fromhex(rec["target_hex"]))
     if ok:
-        with DB.locked():
+        st = L.bank({"addr": rec["addr"], "name": name, "size": size,
+                     "module": rec["module"], "versions": ["permuter"]}, src)
+        if st == "refused":
+            return "nochange"
+        with DB.locked():                       # dup = another shard banked it
             db = DB.load_db()
-            ext = "cpp" if src.startswith("//cpp") else "c"
-            (DB.SRC / f"{name}.{ext}").write_text(src if src.endswith("\n") else src + "\n")
-            with DB.LEDGER.open("a") as f:
-                f.write(json.dumps({"addr": rec["addr"], "name": name, "size": size,
-                                    "module": rec["module"], "versions": ["permuter"]}) + "\n")
             db.pop((rec["module"], rec["addr"]), None)
             DB.save_db(db)
         return "banked"

@@ -31,6 +31,7 @@ import modules as MOD
 import sweep
 import knowledge as KB
 import demangle as DM
+import ledger as L
 
 REPO_SRC = pathlib.Path(__file__).resolve().parent.parent / "src"
 PCREL = re.compile(r"\[pc,#(0x[0-9a-fA-F]+|\d+)\]")
@@ -181,10 +182,11 @@ def main():
                          "pile then takes the top --limit.")
     args = ap.parse_args()
 
-    done = sweep.load_done()
+    matched = L.matched_set()            # example pool: byte-exact matches only
+    done = L.load_done()                 # matched + parked: skipped as targets
     gsyms = R.load_all_syms()
     kb = KB.build_kb()
-    ex_mnem, ex_callee = (build_example_index(done, gsyms, args.max)
+    ex_mnem, ex_callee = (build_example_index(matched, gsyms, args.max)
                           if (args.examples > 0 or args.similar) else ({}, {}))
 
     if args.list_classes:

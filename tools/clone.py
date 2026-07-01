@@ -11,13 +11,14 @@ This compounds: every function the LLM loop lands becomes a template for its
 byte-clones, so re-running clone.py after each bank harvests the new clones for
 free. Run it as the cheap first pass before spending tokens on a fan-out.
 
+Dry-run by default; pass --apply to bank.
+
 Usage:
-    python tools/clone.py                 # verify + bank all clones
-    python tools/clone.py --dry-run       # report only, bank nothing
+    python tools/clone.py                 # report only, bank nothing
+    python tools/clone.py --apply         # verify + bank all clones
     python tools/clone.py --max 0x200     # limit by function size
 """
 import argparse
-import json
 import pathlib
 import re
 import sys
@@ -27,10 +28,10 @@ import modules as MOD
 import relocs as R
 import sweep as SW
 import swarm as S
+import ledger as L
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 SRC = REPO / "src"
-LEDGER = REPO / "progress" / "matched.jsonl"
 
 
 def norm_key(base, addr, size, raw, relocs):
@@ -66,10 +67,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--max", type=lambda x: int(x, 0), default=0x200)
     ap.add_argument("--min", type=lambda x: int(x, 0), default=0x0)
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--apply", action="store_true", help="bank the verified clones")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="no-op; dry-run is the default (kept for compatibility)")
     args = ap.parse_args()
+    do_apply = args.apply and not args.dry_run
 
-    done = SW.load_done()
+    matched_keys = L.matched_set()       # byte-exact matches: template candidates
+    done = L.load_done()                 # matched + parked: not re-attempted
 
     # Index matched functions by structural key (only those we have source for).
     matched = {}          # key -> (name, src, target_bytes)
@@ -88,12 +93,12 @@ def main():
             ins = list(S.md.disasm(raw, 0))
             if not ins or S.is_thunk(ins):
                 continue
-            if (label, addr) in done:
+            if (label, addr) in matched_keys:
                 if k not in matched:
                     src = read_src(name)
                     if src:
                         matched[k] = (name, src, raw)
-            else:
+            elif (label, addr) not in done:
                 unmatched.append((k, label, addr, size, name, raw))
 
     print(f"matched templates: {len(matched)}   unmatched in range: {len(unmatched)}")
@@ -118,18 +123,15 @@ def main():
     print(f"clones VERIFIED {len(passed)} (rejects {len(rejects)})")
     for r in rejects[:20]:
         print(f"  reject {r[0]}  {r[1]}")
-    if args.dry_run:
-        print("(dry-run: nothing banked)")
+    if not do_apply:
+        print("(dry-run: nothing banked; re-run with --apply)")
         return
 
+    landed = 0
     for name, addr, size, mod, src in passed:
-        ext = "cpp" if src.startswith("//cpp") else "c"
-        (SRC / f"{name}.{ext}").write_text(src if src.endswith("\n") else src + "\n",
-                                           encoding="utf-8")
-        with LEDGER.open("a") as f:
-            f.write(json.dumps({"addr": f"0x{addr:08x}", "name": name, "size": size,
-                                "module": mod, "versions": ["clone"]}) + "\n")
-    print(f"banked {len(passed)}")
+        landed += L.bank({"addr": addr, "name": name, "size": size, "module": mod,
+                          "versions": ["clone"]}, src) == "banked"
+    print(f"banked {landed}/{len(passed)}")
 
 
 if __name__ == "__main__":

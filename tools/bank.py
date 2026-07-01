@@ -10,9 +10,11 @@ under a top-level "result" key) plus the worklist that produced the batch (for e
 function's addr/size/module/target_hex). Passing candidates are written to
 src/<name>.c|cpp and appended to progress/matched.jsonl tagged "agent-llm".
 
+Dry-run by default; pass --apply to bank.
+
 Usage:
-    python tools/bank.py --result <workflow-output.json> --worklist progress/wl.jsonl
-    python tools/bank.py --result r.json --worklist wl.jsonl --dry-run   # verify only
+    python tools/bank.py --result <output.json> --worklist progress/wl.jsonl           # verify only
+    python tools/bank.py --result r.json --worklist wl.jsonl --apply                   # verify + bank
 """
 import argparse
 import json
@@ -22,10 +24,9 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import swarm as S
 import triage
+import ledger as L
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-SRC = REPO / "src"
-LEDGER = REPO / "progress" / "matched.jsonl"
 NEARMISS = REPO / "progress" / "nearmiss.jsonl"
 
 
@@ -60,8 +61,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--result", required=True)
     ap.add_argument("--worklist", required=True)
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--apply", action="store_true", help="bank the verified matches")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="no-op; dry-run is the default (kept for compatibility)")
     args = ap.parse_args()
+    do_apply = args.apply and not args.dry_run
 
     wins = load_wins(args.result)
     meta = load_meta(args.worklist)
@@ -86,18 +90,18 @@ def main():
     print(f"VERIFIED {len(passed)}/{len(wins)}")
     for r in rejects:
         print(f"  REJECT {r[0]}  {r[1]}")
-    if args.dry_run:
-        print("(dry-run: nothing banked)")
+    if not do_apply:
+        print("(dry-run: nothing banked; re-run with --apply)")
         return
 
-    banked_names = {p[0] for p in passed}
+    banked_names, landed = set(), 0
     for name, addr, size, mod, src in passed:
-        ext = "cpp" if src.startswith("//cpp") else "c"
-        (SRC / f"{name}.{ext}").write_text(src if src.endswith("\n") else src + "\n")
-        with LEDGER.open("a") as f:
-            f.write(json.dumps({"addr": f"0x{addr:08x}", "name": name, "size": size,
-                                "module": mod, "versions": ["agent-llm"]}) + "\n")
-    print(f"banked {len(passed)}")
+        st = L.bank({"addr": addr, "name": name, "size": size, "module": mod,
+                     "versions": ["agent-llm"]}, src)
+        if st != "refused":              # dup = already matched; exclude either way
+            banked_names.add(name)
+        landed += st == "banked"
+    print(f"banked {landed}/{len(passed)}")
 
     # Near-misses: the agents' closest COMPILING attempts that did not byte-match.
     # Keep the ones that genuinely compile and don't already match, and write them as
@@ -112,14 +116,10 @@ def main():
         addr, size, mod, tb = meta[name]
         try:
             if S.oracle_ok(src, name, tb):           # actually a match the agent under-reported
-                ext = "cpp" if src.startswith("//cpp") else "c"
-                (SRC / f"{name}.{ext}").write_text(src if src.endswith("\n") else src + "\n")
-                with LEDGER.open("a") as f:
-                    f.write(json.dumps({"addr": f"0x{addr:08x}", "name": name,
-                                        "size": size, "module": mod,
-                                        "versions": ["agent-llm"]}) + "\n")
+                st = L.bank({"addr": addr, "name": name, "size": size,
+                             "module": mod, "versions": ["agent-llm"]}, src)
                 banked_names.add(name)
-                bonus += 1
+                bonus += st == "banked"
                 continue
             code, _ = triage.compile_candidate(src, name)   # keep only if it compiles
             if code is None:
@@ -131,8 +131,12 @@ def main():
     if bonus:
         print(f"banked {bonus} extra from near-misses that actually matched")
     if near:
-        NEARMISS.write_text("".join(json.dumps(s) + "\n" for s in seeds))
-        print(f"near-misses: {len(near)} returned, {len(seeds)} compiling seeds -> {NEARMISS.name}")
+        # append, never overwrite: earlier runs' seeds may not be ingested yet
+        NEARMISS.parent.mkdir(parents=True, exist_ok=True)
+        with NEARMISS.open("a", encoding="utf-8") as f:
+            for s in seeds:
+                f.write(json.dumps(s) + "\n")
+        print(f"near-misses: {len(near)} returned, {len(seeds)} compiling seeds appended -> {NEARMISS.name}")
         if seeds:
             print(f"  permute them: python tools/permuter/batch.py --seeds {NEARMISS} --secs 120")
 

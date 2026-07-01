@@ -25,25 +25,14 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 import nearmiss_db as NM
 import categorize_misses as CAT
+import ledger as L
 
 SRC = REPO / "src"
-MATCHED = REPO / "progress" / "matched.jsonl"
-NONMATCH = REPO / "progress" / "nonmatching.jsonl"
 TOTAL_FUNCS = 11390
 
 HEADER = ("// NONMATCHING: {reason} (div={div}). Logic verified correct vs ROM; not\n"
           "// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).\n"
           "// Counts as decompiled, not matched.\n")
-
-
-def _load(path):
-    out = {}
-    if path.exists():
-        for l in path.read_text().splitlines():
-            if l.strip():
-                r = json.loads(l)
-                out[(r["module"], r["addr"])] = r
-    return out
 
 
 def _record(name, src, reason, div, addr, size, module):
@@ -57,14 +46,12 @@ def _record(name, src, reason, div, addr, size, module):
     else:
         body = hdr + body
     (SRC / f"{name}.{ext}").write_text(body)
-    with NONMATCH.open("a") as f:
-        f.write(json.dumps({"addr": addr, "name": name, "size": size,
-                            "module": module, "divergences": div, "reason": reason}) + "\n")
+    L.append_nonmatching({"addr": addr, "name": name, "size": size,
+                          "module": module, "divergences": div, "reason": reason})
 
 
 def add(args):
-    matched = _load(MATCHED)
-    nonm = _load(NONMATCH)
+    matched = L.matched_set()
     src = pathlib.Path(args.c).read_text() if args.c else None
     if src is None:
         # pull from the near-miss DB
@@ -77,7 +64,7 @@ def add(args):
     if not info:
         print(f"cannot resolve {args.name}"); return
     addr, size, module, thex = info
-    if (module, addr) in matched:
+    if L.make_key(module, addr) in matched:
         print(f"{args.name} is already MATCHED (byte-exact) -- not nonmatching"); return
     div, ok = NM.evaluate(src, args.name, bytes.fromhex(thex))
     if ok:
@@ -98,8 +85,7 @@ def add(args):
 
 
 def ingest_nearmiss(args):
-    matched = _load(MATCHED)
-    nonm = _load(NONMATCH)
+    done = L.load_done()
     db = [json.loads(l) for l in (REPO / "nearmiss" / "db.jsonl").read_text().splitlines() if l.strip()]
     added = 0
     for r in db:
@@ -107,7 +93,7 @@ def ingest_nearmiss(args):
         if not info:
             continue
         addr, size, module, thex = info
-        if (module, addr) in matched or (module, addr) in nonm:
+        if L.make_key(module, addr) in done:
             continue
         div = r.get("divergences")
         if div is None or div > args.max_div:
@@ -120,16 +106,20 @@ def ingest_nearmiss(args):
         if reason not in ("base materialization / addressing", "register allocation"):
             continue
         _record(r["name"], r["c_source"], reason, div, addr, size, module)
-        nonm[(module, addr)] = True
+        done.add(L.make_key(module, addr))
         added += 1
         print(f"  + {r['name'][:46]:46} div={div} {reason}")
     print(f"\ningested {added} nonmatching (floor) entries.")
 
 
 def stats(args):
-    matched = _load(MATCHED)
-    nonm = _load(NONMATCH)
-    m, n = len(matched), len(nonm)
+    nonm = {}
+    for r in L.read_records(L.NONMATCHING):
+        try:
+            nonm[L.key_of(r)] = r
+        except Exception:
+            pass
+    m, n = len(L.matched_set()), len(nonm)
     print(f"matched (byte-exact): {m} ({100*m/TOTAL_FUNCS:.2f}%)")
     print(f"nonmatching (floor):  {n}")
     print(f"decompiled total:     {m+n} ({100*(m+n)/TOTAL_FUNCS:.2f}%)")

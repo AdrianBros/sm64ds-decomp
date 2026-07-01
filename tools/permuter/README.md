@@ -50,8 +50,8 @@ End-to-end pipeline runs on our mwccarm toolchain, native Windows, no external o
 - [x] **LLM -> permuter loop** (WIRED 2026-06-20): the fan-out now recovers its own misses.
   1. The crack-worklist fan-out agents return a `near_misses` array (their closest attempt
      that COMPILES but didn't byte-match) alongside verified `wins`.
-  2. `tools/bank.py` extracts them: drops non-compiling ones, banks any that actually match
-     (agent under-reported), and writes the rest as seeds to `progress/nearmiss.jsonl`.
+  2. `tools/bank.py --apply` extracts them: drops non-compiling ones, banks any that actually
+     match (agent under-reported), and appends the rest as seeds to `progress/nearmiss.jsonl`.
   3. `python tools/permuter/batch.py --seeds progress/nearmiss.jsonl --secs 120` permutes
      each and auto-banks the oracle-verified score-0 matches.
   Net: a draft that "compiles but misses" (correct logic, wrong register coloring) is no

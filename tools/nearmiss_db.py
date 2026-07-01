@@ -27,35 +27,18 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 import match as M
 import swarm as S
+import ledger as L
 
 DB = REPO / "nearmiss" / "db.jsonl"
-SRC = REPO / "src"
-LEDGER = REPO / "progress" / "matched.jsonl"
 LOCKDIR = REPO / "nearmiss" / ".lock"
 REG = re.compile(r"\b(r\d+|sb|sl|fp|ip|sp|lr|pc)\b")
 
 
-class locked:
-    """Cross-process mutex (atomic mkdir) so multiple cruncher instances can safely
-    read-modify-write the DB and ledger. Hold it only for the brief write, never while
-    permuting."""
-    def __enter__(self):
-        import time, os
-        LOCKDIR.parent.mkdir(parents=True, exist_ok=True)
-        for _ in range(1200):
-            try:
-                os.mkdir(LOCKDIR)
-                return self
-            except FileExistsError:
-                time.sleep(0.1)
-        raise TimeoutError("could not acquire nearmiss db lock")
-
-    def __exit__(self, *a):
-        import os
-        try:
-            os.rmdir(LOCKDIR)
-        except OSError:
-            pass
+def locked():
+    """Cross-process mutex (atomic mkdir on nearmiss/.lock) so multiple cruncher
+    instances can safely read-modify-write the DB. Hold it only for the brief write,
+    never while permuting. Ledger writes have their own lock inside ledger.py."""
+    return L.locked(LOCKDIR)
 
 
 def _disasm(code, relocs):
@@ -104,11 +87,8 @@ def evaluate(src, name, target):
 
 def load_db():
     db = {}
-    if DB.exists():
-        for l in DB.read_text(encoding="utf-8").splitlines():
-            if l.strip():
-                r = json.loads(l)
-                db[(r["module"], r["addr"])] = r
+    for r in L.read_records(DB):        # corrupt lines are reported, not swallowed
+        db[(r["module"], r["addr"])] = r
     return db
 
 
@@ -153,20 +133,12 @@ def resolve_name(name):
     return _NAME_IDX.get(name)
 
 
-def _done_set():
-    done = set()
-    if LEDGER.exists():
-        for l in LEDGER.read_text().splitlines():
-            if l.strip():
-                d = json.loads(l)
-                done.add((d["module"], d["addr"]))
-    return done
-
-
 def ingest(args):
     db = load_db()
     meta = load_meta(args.worklist)
-    done = _done_set()
+    # MATCHED only, not load_done(): parked functions keep their pending drafts
+    # in this DB (the permuter/hand-fix backlog would be wiped otherwise).
+    done = L.matched_set()
     items = []
     if args.result:
         o = json.loads(pathlib.Path(args.result).read_text())
@@ -178,7 +150,7 @@ def ingest(args):
             if l.strip():
                 d = json.loads(l)
                 items.append((d.get("name"), d.get("c_source")))
-    added = improved = 0
+    updates, drops = {}, []
     for name, src in items:
         if not name or not src:
             continue
@@ -191,23 +163,34 @@ def ingest(args):
                 continue
             addr, size, mod, thex = ex["addr"], ex["size"], ex["module"], ex["target_hex"]
         key = (mod, addr)
-        if key in done:                 # already matched -- not a pending near-miss
-            db.pop(key, None)
+        if L.make_key(mod, addr) in done:   # already matched -- not a pending near-miss
+            drops.append(key)
             continue
         div, ok = evaluate(src, name, bytes.fromhex(thex))
         if div is None or ok:           # ok shouldn't happen for an unmatched func; skip if so
             continue
-        cur = db.get(key)
-        if cur is None or div < (cur.get("divergences") if cur.get("divergences") is not None else 1e9):
-            db[key] = {"module": mod, "addr": addr, "name": name, "size": size,
-                       "target_hex": thex, "lang": "cpp" if src.startswith("//cpp") else "c",
-                       "divergences": div, "c_source": src, "source": args.label or "fanout"}
-            if cur is None:
-                added += 1
-            else:
-                improved += 1
-    save_db(db)
-    print(f"ingested: +{added} new, {improved} improved. DB now {len(db)} entries.")
+        best = updates.get(key)
+        if best is None or div < best["divergences"]:
+            updates[key] = {"module": mod, "addr": addr, "name": name, "size": size,
+                            "target_hex": thex, "lang": "cpp" if src.startswith("//cpp") else "c",
+                            "divergences": div, "c_source": src, "source": args.label or "fanout"}
+    # merge under the lock: evaluate() above is slow, so the read-modify-write
+    # happens against a FRESH db snapshot to not clobber concurrent crunchers
+    added = improved = 0
+    with locked():
+        db = load_db()
+        for key in drops:
+            db.pop(key, None)
+        for key, rec in updates.items():
+            cur = db.get(key)
+            curdiv = cur.get("divergences") if cur and cur.get("divergences") is not None else 1e9
+            if cur is None or rec["divergences"] < curdiv:
+                db[key] = rec
+                added += cur is None
+                improved += cur is not None
+        save_db(db)
+        total = len(db)
+    print(f"ingested: +{added} new, {improved} improved. DB now {total} entries.")
 
 
 def stats(args):
@@ -272,22 +255,29 @@ def export_close(args):
 def bank_matches(args):
     """Re-evaluate every entry; bank any that now byte-match (score 0)."""
     db = load_db()
-    banked = 0
+    banked, banked_keys, rescored = 0, [], {}
     for key, r in list(db.items()):
         div, ok = evaluate(r["c_source"], r["name"], bytes.fromhex(r["target_hex"]))
         if ok:
-            ext = r["lang"]
-            (SRC / f"{r['name']}.{ext}").write_text(
-                r["c_source"] if r["c_source"].endswith("\n") else r["c_source"] + "\n")
-            with LEDGER.open("a") as f:
-                f.write(json.dumps({"addr": r["addr"], "name": r["name"], "size": r["size"],
-                                    "module": r["module"], "versions": ["nearmiss-db"]}) + "\n")
-            del db[key]
-            banked += 1
+            st = L.bank({"addr": r["addr"], "name": r["name"], "size": r["size"],
+                         "module": r["module"], "versions": ["nearmiss-db"]},
+                        r["c_source"])
+            if st != "refused":         # dup = matched meanwhile; drop either way
+                banked_keys.append(key)
+                banked += st == "banked"
         elif div is not None:
-            r["divergences"] = div
-    save_db(db)
-    print(f"banked {banked} now-matching entries; DB now {len(db)}.")
+            rescored[key] = div
+    # merge under the lock so a concurrent cruncher's improvements survive
+    with locked():
+        cur = load_db()
+        for key in banked_keys:
+            cur.pop(key, None)
+        for key, div in rescored.items():
+            if key in cur:
+                cur[key]["divergences"] = div
+        save_db(cur)
+        remaining = len(cur)
+    print(f"banked {banked} now-matching entries; DB now {remaining}.")
 
 
 def main():

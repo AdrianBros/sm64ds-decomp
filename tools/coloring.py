@@ -30,6 +30,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import swarm as S
 import modules as MOD
 import sweep
+import ledger as L
 
 REG_RE = re.compile(r"\b(r\d+|sb|sl|fp|ip|sp|lr|pc)\b")
 ALIAS = {"sb": "r9", "sl": "r10", "fp": "r11", "ip": "r12", "sp": "r13", "lr": "r14", "pc": "r15"}
@@ -89,7 +90,7 @@ def main():
     ap.add_argument("--examples", type=int, default=0)
     args = ap.parse_args()
 
-    done = sweep.load_done()
+    done = L.matched_set()               # the study corpus is byte-exact matches only
     n_matched = 0
     n_with_ip = 0
     by_mnemonic = collections.Counter()       # ip instruction mnemonic+slot

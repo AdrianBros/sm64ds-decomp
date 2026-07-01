@@ -26,6 +26,12 @@ git add src/ nearmiss/ README.md && git commit -m "Match N functions via coddog 
 
 Every step still exists standalone (coddog.py, claims.py lock-worklist/release-active,
 bank_run.py, clone.py, paramclone.py, progress.py) if a batch needs surgery.
+All banking tools are DRY-RUN BY DEFAULT and take `--apply` to actually bank
+(bank.py, bank_harvest.py, clone.py, paramclone.py, swarm.py, sweep.py, cascade.py).
+crackloop.py land passes `--apply` where needed, so the one-command flow is unchanged.
+Ledger reads/writes go through tools/ledger.py: one canonical (module, addr) key,
+locked atomic appends with an under-lock duplicate check, and bank refusals when a
+src/<name>.* file belongs to a different function.
 tools/claims.py is committed; its API key is NOT (CLAIMS_API_KEY env var or the
 gitignored tools/claims_key.txt). Without a key, claim checks still work read-only -
 coordinate via CLAIMS.md.

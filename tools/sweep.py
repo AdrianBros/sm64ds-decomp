@@ -10,34 +10,18 @@ Usage:
     python tools/sweep.py --module ov006  # one module
 """
 import argparse
-import json
 import pathlib
 import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import swarm as S
-import match as M
 import relocs as R
 import modules as MOD
+import ledger as L
 
-MATCHED = M.REPO / "progress" / "matched.jsonl"
-SRC = M.REPO / "src"
 LINE_RE = re.compile(
     r"^(\S+)\s+kind:function\((arm|thumb),size=0x([0-9a-fA-F]+)\)\s+addr:0x([0-9a-fA-F]+)")
-
-
-def load_done():
-    done = set()
-    if MATCHED.is_file():
-        for line in MATCHED.read_text(errors="ignore").splitlines():
-            if line.strip():
-                try:
-                    o = json.loads(line)
-                    done.add((o.get("module", "arm9"), int(o["addr"], 0)))
-                except Exception:
-                    pass
-    return done
 
 
 def funcs(mod):
@@ -62,7 +46,7 @@ def main():
     ap.add_argument("--apply", action="store_true")
     args = ap.parse_args()
 
-    done = load_done()
+    done = L.load_done()
     gsyms = R.load_all_syms()                       # cross-module name resolution
     grand = 0
     rows = []
@@ -97,15 +81,11 @@ def main():
             if S.oracle_ok(csrc, name, tgt):
                 wins.append((name, addr, size, lbl, csrc))
         if args.apply and wins:
-            with MATCHED.open("a") as f:
-                for name, addr, size, lbl, csrc in wins:
-                    f.write(json.dumps({"addr": f"0x{addr:08x}", "name": name, "size": size,
-                                        "module": label, "versions": [f"template:{lbl}"]}) + "\n")
-                    is_cpp = csrc.startswith("//cpp")
-                    cp = SRC / f"{name}.{'cpp' if is_cpp else 'c'}"
-                    if not cp.exists():
-                        cp.write_text(csrc if is_cpp else
-                                      (S.pretty(csrc) if " { " in csrc else csrc))
+            for name, addr, size, lbl, csrc in wins:
+                body = csrc if csrc.startswith("//cpp") else \
+                    (S.pretty(csrc) if " { " in csrc else csrc)
+                L.bank({"addr": addr, "name": name, "size": size,
+                        "module": label, "versions": [f"template:{lbl}"]}, body)
         if wins:
             rows.append((label, len(wins)))
             grand += len(wins)

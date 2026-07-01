@@ -16,13 +16,14 @@ substitution simply fails the oracle and is dropped, so the pass is always safe.
 Like clone.py it compounds -- each newly matched representative becomes a template
 for its whole skeleton family -- so run it after each LLM batch.
 
+Dry-run by default; pass --apply to bank.
+
 Usage:
-    python tools/paramclone.py --dry-run
-    python tools/paramclone.py                 # verify + bank
+    python tools/paramclone.py                 # report only, bank nothing
+    python tools/paramclone.py --apply         # verify + bank
     python tools/paramclone.py --max 0x200     # size cap (default 0x200)
 """
 import argparse
-import json
 import pathlib
 import re
 import sys
@@ -33,10 +34,9 @@ import relocs as R
 import sweep as SW
 import swarm as S
 import clone as CL
+import ledger as L
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-SRC = REPO / "src"
-LEDGER = REPO / "progress" / "matched.jsonl"
 
 PCREL = re.compile(r"\[pc,\s*#(-?(?:0x[0-9a-fA-F]+|[0-9]+))\]")
 IMM = re.compile(r"#(-?(?:0x[0-9a-fA-F]+|[0-9]+))")
@@ -110,10 +110,14 @@ def main():
     ap.add_argument("--min", type=lambda x: int(x, 0), default=0x0)
     ap.add_argument("--per-skel", type=int, default=4,
                     help="templates to try per skeleton before giving up")
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--apply", action="store_true", help="bank the verified matches")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="no-op; dry-run is the default (kept for compatibility)")
     args = ap.parse_args()
+    do_apply = args.apply and not args.dry_run
 
-    done = SW.load_done()
+    matched_keys = L.matched_set()       # byte-exact matches: template candidates
+    done = L.load_done()                 # matched + parked: not re-attempted
     templates = {}     # skeleton -> list of (name, src, vals)
     unmatched = []     # (skeleton, vals, module, addr, size, name, target_bytes)
     for mod in MOD.modules():
@@ -128,13 +132,13 @@ def main():
             if not ins or S.is_thunk(ins):
                 continue
             skel, vals = analyze(addr, ins, raw, relocs)
-            if (label, addr) in done:
+            if (label, addr) in matched_keys:
                 bucket = templates.setdefault(skel, [])
                 if len(bucket) < args.per_skel:
                     src = CL.read_src(name)
                     if src:
                         bucket.append((name, src, vals))
-            else:
+            elif (label, addr) not in done:
                 unmatched.append((skel, vals, label, addr, size, name, raw))
 
     print(f"skeleton templates: {len(templates)}   unmatched in range: {len(unmatched)}")
@@ -157,20 +161,17 @@ def main():
                 continue
 
     print(f"parameterized clones VERIFIED {len(passed)} (candidates tried {tried})")
-    if args.dry_run:
+    if not do_apply:
         for name, addr, size, mod, _ in passed[:30]:
             print(f"  would bank {mod} {name} (0x{size:x})")
-        print("(dry-run: nothing banked)")
+        print("(dry-run: nothing banked; re-run with --apply)")
         return
 
+    landed = 0
     for name, addr, size, mod, src in passed:
-        ext = "cpp" if src.startswith("//cpp") else "c"
-        (SRC / f"{name}.{ext}").write_text(src if src.endswith("\n") else src + "\n",
-                                           encoding="utf-8")
-        with LEDGER.open("a") as f:
-            f.write(json.dumps({"addr": f"0x{addr:08x}", "name": name, "size": size,
-                                "module": mod, "versions": ["paramclone"]}) + "\n")
-    print(f"banked {len(passed)}")
+        landed += L.bank({"addr": addr, "name": name, "size": size, "module": mod,
+                          "versions": ["paramclone"]}, src) == "banked"
+    print(f"banked {landed}/{len(passed)}")
 
 
 if __name__ == "__main__":
