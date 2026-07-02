@@ -136,6 +136,11 @@ virtual methods are fine - we only `-c` compile, never link; only the vtable lay
   ```
   CW also has a split form `add r0,r0,#OFF; ldr rV,[r0]` - it picks per offset; both come from
   the same C++.
+  **Never emulate a vtable call in C (2026-07-02, func_ov006_0210d1fc, Fable):** the C
+  form (`(*(fn**)(*(int*)obj + 0x48))(obj, 3)`) always HOISTS the vtable load off the
+  object register; only a real `//cpp` virtual call (`((Obj*)c)->m48(3)`) produces the
+  `mov r0,r4; ldr r2,[r0]` this-temp shape. If a diff shows the vtable load reading
+  from r0 (the this-copy) instead of the object's home register, switch to real C++.
 - **Pointer-to-member-function (PMF) call** has a fixed ARM ABI prologue:
   `ldr r3,[r0,#OFF]; ldr r1,[r3,#4]; add r0,r0,r1,asr#1; ands r1,r1,#1; ldrne...; blx`.
   Source: `PMF* p = c->pp [+ N/8]; (c->**p)();` with `typedef void (C::*PMF)();`. The
@@ -312,7 +317,8 @@ permuter's ~8k iterations) had exhausted. The working levers, in order of genera
   order of first use.
 
 Still floor after this pass (7/12): zero-offset first-access-fold materialization,
-pre-indexed writeback from plain C, pure register-coloring swaps (~150 variants tried
+pre-indexed writeback from plain C (but see 6g 2026-07-02: escaped-array alias +
+laundering can fuse into writeback), pure register-coloring swaps (~150 variants tried
 on func_ov075_0211a948), and store-emission order.
 
 ## 6f. The pragma space, exhaustively characterized (2026-07-01)
@@ -377,6 +383,51 @@ on two freshly-retired floor drafts: both byte-MATCH on first application
 (func_ov072_0211f9c4, Player::St_Squish_Init). A mechanical sweep applies it across
 the whole backlog - see the crack-loop runbook. The floor sections above remain
 correct about PLAIN C forms; the laundered form escapes them.
+
+**Laundering MASK PLACEMENT matters (2026-07-02, Opus→Fable 0x140-0x280 batch,
+func_ov002_020b9c00):** when `(((int)base + OFF) & 0xFFFFFFFFFFFFFFFF)` splits into
+`mov + adds` instead of the single `add rX, base, #OFF`, wrap the COMPLETED 32-bit
+address instead: `((long long)(int)(base + OFF)) & 0xFFFFFFFFFFFFFFFFLL`. The
+pointer arithmetic folds to one add before the 64-bit detour, yielding
+`add r2,r4,#0x8e` + `ldrsh/strh [r2]`. Try both placements before calling floor.
+
+**Pre-indexed writeback from (laundered) C - the plain-C floor has a second exit
+(2026-07-02, same batch, func_ov081_02124b98):** a write-only local struct the ROM
+emits member-wise was only retained by mwcc as an aggregate copy (ldm/stm) - UNTIL
+the copy was rephrased as an address-escaped array `v[2]` aliasing the struct with
+its delta (stores survive DSE, values stay in regs) PLUS 6g laundering of the base;
+the peephole then fuses the materialized add into `ldr r1,[r0,#0x5c]!` - a writeback
+form previously seen only from C++ virtual dispatch (sec 5). "Pre-indexed writeback
+from plain C" in the 6e floor list is now conditional, not absolute.
+
+**volatile-in-condition defeats CSE per branch arm (2026-07-02, same batch,
+func_ov006_020c68f4):** when the target reloads a value in each arm that mwcc wants
+to CSE from the `if` compare, a volatile read in the condition forces every arm to
+re-load (`[dst+0x20]` reloaded per arm, no reuse of the cmp value).
+
+**Mutable-variable subtraction beats the rsb const-fold (2026-07-02, same batch,
+func_ov004_020b3cb8, Opus):** `v = K - x` const-folds to `rsb`; writing
+`int v = K; v -= x;` forces the ROM's `mov rX,#K; sub` pair.
+
+**Two Opus-declared floors cracked by Fable retry (2026-07-02, 0x400-0x800 batch):**
+
+- **Loop-tail store-emission order** (func_ov004_020b2cb8, div 4, "volatile had zero
+  effect" per Opus): the working combo is volatile store/load + routing the address
+  through the REUSED plain temp + `#pragma opt_strength_reduction off` above the
+  function (the pragma stops the address-as-value form from strength-reducing).
+  Named laundered pointers always mis-colored - only plain temps reach r7.
+- **Register-coloring swap that survives decl-order permutation** (func_ov060_02111f08,
+  div 7): the lever was STORE-ORDER statement permutation inside the block (compute
+  z,y,x; store sp.x,sp.y,sp.z), found by a scripted sweep of store-order perms. When
+  decl-order and compute-order permutation stall on a coloring residual, sweep the
+  STORE order before calling floor - extends the "statement order of first demand"
+  rule (6e) to emission sites.
+- Also (func_ov085_0212c230): passing a constant arg EXPLICITLY (`&data_...` instead
+  of relying on CSE) colors the compare chain; a volatile read on one call arg orders
+  it relative to other volatile reads across a call boundary.
+
+Both cracks took the agent 60+ attempts - on promoted div<=8 drafts the long grind
+can pay (Fable, effort high, retry tier only); do not extend this to fresh fan-out.
 
 **The "pool-load of an immediate-encodable constant" class (6d) was a MISDIAGNOSIS**
 (2026-07-02, func_0201a614): the pool slot is not a constant - it is a SYMBOL ADDRESS

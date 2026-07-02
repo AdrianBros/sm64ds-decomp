@@ -186,6 +186,29 @@ SFA-decomp pragma technique does not transfer; the ordering floor stays hand-fix
   lane. The u64 laundering idiom carried 6 of 16; one agent reached for asm{} on a
   pooled-offset RMW and pure C (laundering + encoding-forced split) reproduced it -
   no asm needed, repo stays asm-free for game logic.
+- **Opus→Fable two-stage on 0x140-0x280 round 3 (2026-07-02, third pass, sims
+  0.54-0.75): Opus 4/12 (33%) at 162K/landed, then Fable on the 5 non-floor misses
+  = 5/5 (100%) at 30K/landed** - div 3/4/11/20/28 all cracked, including two new
+  levers (laundering mask placement, escaped-array pre-indexed writeback - see
+  mwccarm-codegen 6g 2026-07-02). Triage rule that produced the 5/5: promote
+  materialization/source-shape residuals, leave coloring/ordering/tail-merge
+  diagnoses in the DB. The Fable retry is now the cheapest paid tier measured;
+  the expensive part is the Opus first pass on a thrice-drained band.
+- **0x400-0x800 round 3 on Opus->Fable (2026-07-02, m2c drafts, sims 0.27-0.60):
+  Opus 5/12 at 182K/landed but BIG targets (~6.5KB, ~140 tok/byte incl. the 39-entry
+  PMF table func_02008550 and Player::St_MetalWaterGround_Main); then Fable retry
+  4/4 at 52K/landed** - including TWO Opus-declared floors (store-emission order,
+  decl-order-proof coloring swap; levers now in mwccarm-codegen 6g 2026-07-02) and
+  the real-C++-vtable misshape (sec 5). TRIAGE UPDATE: on LARGE functions, promote
+  floor-labeled misses at div<=8 too - they are 97-99% matched and Fable's 60+-attempt
+  grind cracked 2/2 of them; park only deep cascades (div 27/32/91 all stayed parked).
+  Fable promotion tier record so far: 9/9 across two batches.
+- **WRONG-DEST salvage (2026-07-02, func_ov066_02119ce8):** when the land link-gate
+  rejects an agent MATCH with `WRONG-DEST reloc` and the function stores/loads two
+  same-shaped globals (e.g. two zero-stores), the agent likely swapped the symbols -
+  swap them in the source, re-run abverify (still MATCH), then land via a synthesized
+  single-function output file ({result:{landed,landedNames,results,sources}}). The
+  byte oracle is blind to this class by design; the gate catches it.
 
 ## Reading the hit rate (why it decays, what to do)
 
