@@ -104,6 +104,15 @@ def refine(a):
         sys.exit(1)
     run("refine_wl.py", "--max-div", str(a.max_div), "--limit", str(a.limit))
     wlr = REPO / "progress" / "wl_refine.jsonl"
+    if a.no_claims:
+        print("--no-claims: skipping the lock step (coordinate via CLAIMS.md)")
+        active.write_text("[]")
+        rows = [__import__("json").loads(l) for l in wlr.read_text(encoding="utf-8").splitlines() if l.strip()]
+        names = [r["name"] for r in rows]
+        print(f"\n{len(names)} drafts ready. Launch:")
+        print(f'Workflow({{ scriptPath: "tools/refine_run.js", args: {json.dumps(names)} }})')
+        print("\nthen land with: python tools/crackloop.py land --output <task.output> --refine")
+        return
     try:
         sys.path.insert(0, str(TOOLS))
         import claims
@@ -233,6 +242,8 @@ def main():
     p = sub.add_parser("refine", help="export closest fixable near-misses for refine_run.js")
     p.add_argument("--max-div", type=int, default=6)
     p.add_argument("--limit", type=int, default=20)
+    p.add_argument("--no-claims", action="store_true",
+                   help="skip claims locking (e.g. expired local key)")
     p.set_defaults(fn=refine)
     p = sub.add_parser("land", help="bank + free post-pass + release + progress")
     p.add_argument("--output", required=True, help="Workflow task .output file")
