@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: different op / idiom (div=24). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 extern "C" {
 struct V3 { int x, y, z; };
 struct RG { char buf[0x54]; };
@@ -22,13 +19,12 @@ void func_ov077_02123c6c(char* c, void* w){
   func_02038420(w);
   if (_ZNK12WithMeshClsn8IsOnWallEv(w) != 0) {
     _ZNK11SurfaceInfo12CopyNormalToER7Vector3((char*)_ZNK12WithMeshClsn13GetWallResultEv(w) + 4, &nrm);
+    *(unsigned char*)(((int)c + 0x41d) & 0xFFFFFFFFFFFFFFFF) ^= 1;
   }
-  *(unsigned char*)(c+0x41d) ^= 1;
-  int t = *(int*)(c+0x60);
   pos.x = *(int*)(c+0x5c);
-  pos.y = t;
+  pos.y = *(int*)(c+0x60);
   pos.z = *(int*)(c+0x64);
-  pos.y = t + 0x64000;
+  pos.y += 0x64000;
   _ZN13RaycastGroundC1Ev(&rg);
   _ZN13RaycastGround12SetObjAndPosERK7Vector3P5Actor(&rg, &pos, 0);
   _ZN4BgCh19StartDetectingWaterEv(&rg);

@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: different op / idiom (div=24). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef int Fix12;
 typedef unsigned int u32;
 
@@ -49,7 +46,7 @@ extern "C" int func_ov085_0212de5c(PlayerObj *c)
     c->v8c = 0x1000;
     c->v90 = 0x800;
     {
-        int *pp = &c->v2c8;
+        int *pp = (int *)(((int)c + 0x2c8) & 0xFFFFFFFFFFFFFFFF);
         int n = *pp + 1;
         *pp = n;
     }
@@ -62,13 +59,13 @@ extern "C" int func_ov085_0212de5c(PlayerObj *c)
         func_0201f32c(1);
         break;
     case 0x82:
-        func_ov085_0212e728(c, data_ov085_021307b0);
+        p->v723 = 0;
         break;
     case 0xb4:
         data_0209d66c = 1;
         break;
     case 0xd2:
-        p->v723 = 0;
+        func_ov085_0212e728(c, data_ov085_021307b0);
         break;
     }
     return 1;

@@ -1,6 +1,3 @@
-// NONMATCHING: different op / idiom (div=23). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef unsigned char u8;
 typedef signed char s8;
 typedef unsigned short u16;
@@ -24,15 +21,13 @@ void func_02064554(int self, int sel, int idx, s16 a3)
     *(s16 *)(o + 0xe) = a3;
 
     switch (sel) {
+    case 8:
+        *(s32 *)(o + 0x14) = *(s32 *)(c + 0x10);
+        break;
     case 2:
         *(s16 *)(o + 0x14) = *(s16 *)(c + 0xa);
         *(s16 *)(o + 0x16) = *(s16 *)(c + 6);
         *(s16 *)(o + 0x18) = *(s16 *)(c + 4);
-        break;
-    case 8:
-        *(s32 *)(o + 0x14) = *(s32 *)(c + 0x10);
-        break;
-    case 14:
         break;
     case 10:
         {
@@ -44,6 +39,9 @@ void func_02064554(int self, int sel, int idx, s16 a3)
             *(s8 *)(o + 0x1d) = v;
             func_0205a61c(*(s32 *)(c + 0x20), (int)(o + 0x14), *(u8 *)(o + 0x1d));
         }
+        break;
+    case 12:
+    case 14:
         break;
     }
 

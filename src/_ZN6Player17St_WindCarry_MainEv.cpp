@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: different op / idiom (div=24). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef int Fix12;
 typedef unsigned char u8;
 
@@ -42,7 +39,7 @@ int Player::St_WindCarry_Main()
             else
                 speed = __aeabi_idiv(0x2710000, (val + 0xc8000) >> 12);
             if (*(int*)(c + 0xa8) < speed) {
-                int* p = (int*)(c + 0xa8);
+                int* p = (int*)(((int)c + 0xa8) & 0xFFFFFFFFFFFFFFFF);
                 *p = *p + (speed >> 3);
                 if (*(int*)(c + 0xa8) > speed) *(int*)(c + 0xa8) = speed;
             }
@@ -52,11 +49,10 @@ int Player::St_WindCarry_Main()
     if (*(u8*)(c + 0x6e3) == 0 && FinishedAnim() != 0) {
         SetAnim(0x73, 0, 0x1000, 0);
         {
-            u8* q = (u8*)(c + 0x6e3);
+            u8* q = (u8*)(((int)c + 0x6e3) & 0xFFFFFFFFFFFFFFFF);
             *q = *q + 1;
         }
-        func_ov002_020bedd4(c);
-        return 1;
     }
-    return *(u8*)(c + 0x6e3);
+    func_ov002_020bedd4(c);
+    return 1;
 }

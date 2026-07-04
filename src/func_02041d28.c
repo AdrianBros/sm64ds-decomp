@@ -1,10 +1,7 @@
-// NONMATCHING: different op / idiom (div=24). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 struct Node;
 
 extern unsigned int _ZN3IRQ7DisableEv(void);
-extern int func_020658c0(void *node, int a1, void *a2, int a3, int arg5, int arg6);
+extern int func_020658c0(void *node, int a1, void *a2, int a3, int arg5, unsigned short arg6);
 extern void func_02041b24(char *base, char *node);
 extern void _ZN3IRQ7RestoreEj(unsigned int saved);
 
@@ -32,17 +29,21 @@ void func_02041d28(char *r7, struct R6 *r6)
 
     if ((&data_020a1fc0)[3] != 0) {
         int bit;
-        int *q = (int *)(r7 + 0x270c);
+        int *q = (int *)(((int)r7 + 0x270c) & 0xFFFFFFFFFFFFFFFF);
         mask = r6->f84;
         r6->f84 = 0;
         *q |= mask;
         if (r6->f80 <= 0) {
             unsigned int diff = r6->f5c - r6->f58;
-            func_020658c0((char *)r6 + 4, r6->f88, &data_02082158,
+            int a1 = r6->f88;
+            func_020658c0((char *)r6 + 4, a1, &data_02082158,
                           (diff <= 0x400) ? (int)&r6->fc0 : 0, diff, 0);
             func_02041b24(r7, (char *)r6);
         }
-        for (bit = 0; (1 << bit) <= mask; bit++) {
+        for (bit = 0;; bit++) {
+            if ((1 << bit) > mask) {
+                break;
+            }
             if ((1 << bit) & mask) {
                 r6->f80++;
                 ((struct R7 *)r7)->f4 = r6->f88;

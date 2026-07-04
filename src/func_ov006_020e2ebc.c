@@ -1,6 +1,3 @@
-// NONMATCHING: different op / idiom (div=24). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 int func_ov004_020adbe0(void);
 void func_ov004_020b0a54(void* c);
 
@@ -9,7 +6,7 @@ void func_ov006_020e2ebc(char *thiz)
     int i;
     char *p;
     if (*(unsigned short*)(thiz + 0x4ee2) != 0) {
-        *(unsigned short*)(thiz + 0x4ee2) = *(unsigned short*)(thiz + 0x4ee2) - 1;
+        *(unsigned short*)(((int)thiz + 0x4ee2) & 0xFFFFFFFFFFFFFFFF) -= 1;
         if (*(short*)(thiz + 0x4ee2) <= 0)
             *(unsigned short*)(thiz + 0x4ee2) = 0;
         return;

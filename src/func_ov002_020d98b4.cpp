@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: different op / idiom (div=24). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 extern "C" {
 struct Vec3 { int x, y, z; };
 extern int func_ov002_020beb38(char* c);
@@ -12,8 +9,12 @@ extern void* _ZN8Particle6System3NewEjj5Fix12IiES2_S2_PK11Vector3_16fPNS_8Callba
   unsigned int a, unsigned int b, int c, int d, int e, const void* f, void* g);
 
 void func_ov002_020d98b4(char* self){
-  *(unsigned short*)(self+0x6a4) -= func_ov002_020beb38(self);
-  if (*(short*)(self+0x6a4) < 0) *(short*)(self+0x6a4) = 0;
+  int t = func_ov002_020beb38(self);
+  *(unsigned short*)(((int)self + 0x6a4) & 0xFFFFFFFFFFFFFFFF) -= t;
+  {
+    short* q = (short*)(self + 0x600);
+    if (q[0x52] < 0) q[0x52] = 0;
+  }
   {
     unsigned int id = _ZNK6Player14GetBodyModelIDEjb(self, *(int*)(self+8) & 0xff, 0);
     int r5 = *(int*)(*(int*)(self + (id << 2) + 0xdc) + 0x14) + 0x2d0;
@@ -26,6 +27,6 @@ void func_ov002_020d98b4(char* self){
     *(void**)(self+0x628) = _ZN8Particle6System3NewEjj5Fix12IiES2_S2_PK11Vector3_16fPNS_8CallbackE(
       *(unsigned int*)(self+0x628), 0xd6, s.x, s.y, s.z, 0, 0);
   }
-  *(int*)(self+0xb0) |= 0x80;
+  *(int*)(((int)self + 0xb0) & 0xFFFFFFFFFFFFFFFF) |= 0x80;
 }
 }

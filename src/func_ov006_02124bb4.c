@@ -1,6 +1,3 @@
-// NONMATCHING: different op / idiom (div=23). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 extern void func_ov004_020adb1c(int self);
 extern void func_ov004_020b0a54(int v);
 extern void func_ov006_020c0c80(void *c);
@@ -11,7 +8,7 @@ void func_ov006_02124bb4(char *c)
     int *cnt;
     int *p;
 
-    cnt = (int *)(c + 0x51bc);
+    cnt = (int *)(((int)c + 0x51bc) & 0xFFFFFFFFFFFFFFFF);
     *cnt = *cnt - 1;
     if (*(int *)(c + 0x5000 + 0x1bc) > 0)
         return;
@@ -21,7 +18,7 @@ void func_ov006_02124bb4(char *c)
     {
         if (*(int *)(c + 0xb4) < 0x270f)
         {
-            p = (int *)(c + 0xb4);
+            p = (int *)(((int)c + 0xb4) & 0xFFFFFFFFFFFFFFFF);
             *p = *p + 1;
         }
         if (*(int *)(c + 0xb4) > *(int *)(c + 0xb8))
@@ -35,7 +32,7 @@ void func_ov006_02124bb4(char *c)
     {
         if (*(int *)(c + 0xb4) > 0)
         {
-            p = (int *)(c + 0xb4);
+            p = (int *)(((int)c + 0xb4) & 0xFFFFFFFFFFFFFFFF);
             *p = *p - 1;
         }
         func_ov004_020b0a54(5);
