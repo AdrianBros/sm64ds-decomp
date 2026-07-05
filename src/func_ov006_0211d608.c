@@ -1,6 +1,3 @@
-// NONMATCHING: register allocation (div=11). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 extern void _ZN3G2x13SetBlendAlphaEPVttttt(volatile void *p, unsigned short a, unsigned short b, unsigned short c, unsigned short d);
 
 void func_ov006_0211d608(char *c)
@@ -16,5 +13,5 @@ void func_ov006_0211d608(char *c)
     *(unsigned char *)(c + 0x4be3) = 8;
     *(unsigned char *)(c + 0x4be4) = 0;
     *(unsigned char *)(c + 0x4be5) = 0;
-    _ZN3G2x13SetBlendAlphaEPVttttt((volatile void *)0x4000050, 1, 0xc, 0xc, 0x10);
+    _ZN3G2x13SetBlendAlphaEPVttttt((volatile void *)0x4000050, 0, 0xc, 0xc, 0x10);
 }

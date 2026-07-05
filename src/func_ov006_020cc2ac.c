@@ -1,6 +1,3 @@
-// NONMATCHING: base materialization / addressing (div=11). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef short s16;
 extern void func_ov006_020c8c78(int a, int b);
 extern void _Z14ApproachLinearRiii(int *ref, int target, int step);
@@ -11,7 +8,7 @@ extern int data_ov006_0213b0ec;
 
 void func_ov006_020cc2ac(char *c)
 {
-    s16 *p = (s16 *)(c + 0x60);
+    s16 *p = (s16 *)(((int)c + 0x60) & 0xFFFFFFFFFFFFFFFFULL);
     *p = *p - 1;
     if (*(s16 *)(c + 0x60) == 0) {
         func_ov006_020c8c78(*(s16 *)(c + 0x4e), 0xc0);

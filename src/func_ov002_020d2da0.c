@@ -1,6 +1,3 @@
-// NONMATCHING: base materialization / addressing (div=14). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 struct E18 { short v; char pad[0x16]; };
 extern struct E18 data_0209f4a0[];
 extern struct E18 data_0209f49e[];
@@ -14,12 +11,12 @@ int func_ov002_020d2da0(char* c){
   char* p = data_0209f318;
   int cond = (int)(data_0209f4a0[idx].v >= 0x200);
   if(cond | (((unsigned short)data_0209f49e[idx].v) & 0xc03)){
-    *(int*)(p+0x154) &= ~0x2000;
+    *(int*)(((int)p + 0x154) & 0xFFFFFFFFFFFFFFFFull) &= ~0x2000;
     _ZN5Sound13PlayCharVoiceEjjRK7Vector3(*(unsigned char*)(c+0x6d9), 0x2e, c+0x74);
     return 1;
   }
   if(*(unsigned char*)(c+0x6de) == 0) return 0;
-  *(int*)(p+0x154) &= ~0x2000;
+  *(int*)(((int)p + 0x154) & 0xFFFFFFFFFFFFFFFFull) &= ~0x2000;
   _ZN6Player11ChangeStateERNS_5StateE(c, &data_ov002_021101b4);
   return 2;
 }
