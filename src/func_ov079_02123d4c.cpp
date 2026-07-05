@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=9). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef short s16;
 typedef long long s64;
 extern s16 data_02082214[];
@@ -32,8 +29,8 @@ extern "C" void func_ov079_02123d4c(int* out, char* a){
         out[0] = out[0] + (int)(((s64)m * data_02082214[((unsigned short)*(unsigned short*)(a + 0x8e) >> 4) * 2] + 0x800) >> 12);
         d = ((struct Obj*)a)->m1d();
         {
-            int* p1 = &out[1];
-            int* p2 = &out[2];
+            int* p1 = (int*)(((int)out + 4) & 0xFFFFFFFFFFFFFFFF);
+            int* p2 = (int*)(((int)out + 8) & 0xFFFFFFFFFFFFFFFF);
             *p1 = *p1 + d;
             *p2 = *p2 + (int)(((s64)m * data_02082214[((unsigned short)*(unsigned short*)(a + 0x8e) >> 4) * 2 + 1] + 0x800) >> 12);
         }

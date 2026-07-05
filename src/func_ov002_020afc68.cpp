@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=9). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef long long s64;
 struct C { char pad[0x1000]; };
 extern "C" int _ZNK12WithMeshClsn10IsOnGroundEv(void *c);
@@ -11,7 +8,8 @@ extern "C" int _ZN5Actor15IsPlayerInRangeEi(void *self, int r);
 extern "C" void func_ov002_020afc68(unsigned char *self)
 {
     if (_ZNK12WithMeshClsn10IsOnGroundEv(self + 0x144) != 0) {
-        *(int *)(self + 0x98) += 0x19000;
+        int *p = (int *)(((int)self + 0x98) & 0xFFFFFFFFFFFFFFFF);
+        *p += 0x19000;
         *(int *)(self + 0xa8) = 0;
     } else {
         int t = (int)(((s64)*(int *)(self + 0x98) * 0xfae + 0x800) >> 12);

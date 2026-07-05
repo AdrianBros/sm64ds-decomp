@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=9). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 struct C;
 typedef int (C::*PMF)();
 struct C {
@@ -12,8 +9,9 @@ struct C {
 };
 extern "C" int func_0200cae4(C* c){
   if(c->flags & 0x4000){
-    c->flags &= ~0x4000u;
-    c->flags |= 0x8000u;
+    volatile unsigned int* flags = (volatile unsigned int*)(((int)c + 0x154) & 0xFFFFFFFFFFFFFFFF);
+    *flags &= ~0x4000u;
+    *flags |= 0x8000u;
   }
   PMF* p = c->pp;
   if(*(int*)p == 0) return 1;

@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=10). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 extern "C" {
 struct Vector3 { int x, y, z; };
 extern void _ZN5Sound9PlayBank0EjRK7Vector3(unsigned int n, const Vector3& v);
@@ -46,7 +43,7 @@ struct Base {
 extern "C" int func_ov081_02126c8c(char* c)
 {
     _ZN5Sound9PlayBank0EjRK7Vector3(9, *(Vector3*)(c + 0x74));
-    *(int*)(c + 0xb0) &= ~1;
+    *(int*)(((int)c + 0xb0) & 0xFFFFFFFFFFFFFFFF) &= ~1;
     *(int*)(c + 0x98) = 0xa000;
     *(int*)(c + 0xa8) = 0x28000;
     *(unsigned char*)(c + 0x3f2) = 0x2d;

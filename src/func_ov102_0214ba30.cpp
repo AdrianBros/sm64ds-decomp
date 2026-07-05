@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=4). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 extern "C" {
 int _ZN5Actor13DistToCPlayerEv(void* p);
 void func_ov102_0214c0b8(void* p);
@@ -19,7 +16,7 @@ extern "C" void func_ov102_0214ba30(char* c)
     }
     func_ov102_0214c0b8(c);
     {
-        int* f = (int*)(c + 0xb0);
+        int* f = (int*)(((int)c + 0xb0) & 0xFFFFFFFFFFFFFFFF);
         *f = *f | 0x10000001;
     }
     *(unsigned char*)(c + 0x3f3) = 1;

@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=3). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 struct Vector3 { int x, y, z; };
 extern "C" unsigned short DecIfAbove0_Short(unsigned short* p);
 struct Actor {
@@ -24,5 +21,5 @@ extern "C" void func_ov064_0211a2c4(char *thiz)
             *(unsigned char*)(thiz + 0x174),
             v, 4);
     }
-    *(int*)(thiz + 0xb0) |= 1;
+    *(int*)(((int)thiz + 0xb0) & 0xFFFFFFFFFFFFFFFF) |= 1;
 }

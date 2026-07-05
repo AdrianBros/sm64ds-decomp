@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=19). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 struct Actor;
 typedef void (Actor::*PMF)();
 struct Entry { PMF pmf; };
@@ -15,9 +12,9 @@ struct CylinderClsn { void Clear(); void Update(); };
 extern "C" int func_ov060_021176d4(char *thiz)
 {
     Actor *self = (Actor*)thiz;
-    *(int*)(thiz + 0x370) += 1;
+    *(int*)(((int)thiz + 0x370) & 0xFFFFFFFFFFFFFFFF) += 1;
     (self->*data_ov060_0211afb4[*(int*)(thiz + 0x35c)].pmf)();
-    *(unsigned short*)(thiz + 0x374) += 1;
+    *(unsigned short*)(((int)thiz + 0x374) & 0xFFFFFFFFFFFFFFFF) += 1;
     if (*(int*)(thiz + 0x9c) != 0) {
         func_02038420(thiz + 0x110);
         if (*(int*)(thiz + 0x35c) != 4) {

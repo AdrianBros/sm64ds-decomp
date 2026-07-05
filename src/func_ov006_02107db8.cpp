@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=11). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 extern "C" {
 void Matrix4x3_FromTranslation(void *m, int x, int y, int z);
 int func_020124c4(int a, int b, int c, int d);
@@ -29,7 +26,8 @@ struct C {
 extern "C" void func_ov006_02107db8(C *c)
 {
     char *b = (char *)c;
-    *(short *)(b + 0xc2) = (short)(*(short *)(b + 0xc2) + *(short *)(b + 0xc8));
+    short *p = (short *)(((int)b + 0xc2) & 0xFFFFFFFFFFFFFFFF);
+    *p = (short)(*p + *(short *)(b + 0xc8));
     *(short *)(*(int *)(b + 0x20) + 0x82) = (short)(-*(short *)(b + 0xc2));
     c->obj.v3();
     Matrix4x3_FromTranslation(&data_020a0e68, 0, 0, 0);

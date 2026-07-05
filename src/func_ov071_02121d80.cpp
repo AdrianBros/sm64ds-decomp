@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: different op / idiom (div=13). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef short s16;
 struct Vector3 { int x, y, z; };
 
@@ -34,9 +31,9 @@ extern "C" int func_ov071_02121d80(char* c)
     if (b2 == 0) {
         v = data_ov071_021230b8;
         _ZN25MovingCylinderClsnWithPos21SetPosRelativeToActorERK7Vector3(c + 0xfc, v);
+        r.z = *(int*)(c + 0x98);
         r.x = 0;
         r.y = 0;
-        r.z = *(int*)(c + 0x98);
         Matrix4x3_FromRotationY(data_020a0e68, *(s16*)(c + 0x94));
         Matrix4x3_ApplyInPlaceToRotationX(data_020a0e68, *(s16*)(c + 0x92));
         MulVec3Mat4x3(&r, data_020a0e68, c + 0xa4);

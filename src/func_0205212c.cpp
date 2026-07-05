@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=8). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef unsigned int u32;
 
 struct HeapAllocator;
@@ -59,7 +56,7 @@ extern "C" void func_0205212c(Obj *self) {
         node = next;
     }
     IRQ::Restore(irq);
-    u32 *p = (u32*)((char*)self + 0xf0);
+    u32 *p = (u32*)(((int)self + 0xf0) & 0xFFFFFFFFFFFFFFFF);
     *p &= ~1u;
     *p &= ~4u;
     *p &= ~2u;

@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: different op / idiom (div=9). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
@@ -39,9 +36,9 @@ extern "C" void func_02062d10(In *self) {
         if (v != 0) {
             u16 *g = (u16*)(r4 + 0x400);
             g[5] = (u16)((g[5] + 3) % 4);
-        } else {
-            *(u16*)(r4 + 0x400 + 0x1c) = 2;
         }
+        u16 *g = (u16*)(r4 + 0x400);
+        *(u16*)(g + 0x1c/2) = 2;
     } else {
         *(u16*)(r4 + 0x400 + 0x1c) = 3;
     }
