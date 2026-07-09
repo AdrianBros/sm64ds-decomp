@@ -143,6 +143,11 @@ def chat(messages, max_tokens=8000, retries=8):
         # OpenAI Chat Completions dialect (DeepSeek): Bearer auth, /chat/completions, choices[].
         url = BASE_URL.rstrip("/") + "/chat/completions"
         headers = {"authorization": f"Bearer {API_KEY}", "content-type": "application/json"}
+        # A reasoning model (deepseek-reasoner) spends its hidden reasoning INSIDE max_tokens; at
+        # the default 8000 a hard function's reasoning starves/truncates the code block ("no code
+        # block returned"). Give it real headroom - it only bills what it actually uses.
+        if "reason" in MODEL.lower():
+            mt = max(mt, 24000)
         body = {"model": MODEL, "max_tokens": mt, "messages": messages}
     else:
         url = BASE_URL.rstrip("/") + "/v1/messages"
