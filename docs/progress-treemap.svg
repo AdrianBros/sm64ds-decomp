@@ -6453,7 +6453,7 @@ matched: no</title></rect><rect x="136.40" y="504.75" width="3.33" height="5.71"
 module: arm9
 addr: 0x0203cbf0
 size: 28 bytes
-matched: no</title></rect><rect x="139.73" y="504.75" width="3.33" height="5.71" fill="#4a4d52" stroke="#393b3f" stroke-width="0.4"><title>_Znwj
+matched: no</title></rect><rect x="139.73" y="504.75" width="3.33" height="5.71" fill="#4a4d52" stroke="#393b3f" stroke-width="0.4"><title>func_0203cc0c
 module: arm9
 addr: 0x0203cc0c
 size: 28 bytes
