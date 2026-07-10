@@ -7,8 +7,9 @@ Derived the same way as progress.py --write-readme:
   universe   config/**/symbols.txt  (name, addr, size per module)
   matched    src/<name>.c[pp] exists and is not marked // NONMATCHING
   near-miss  nearmiss/db.jsonl (committed) -> div badge
-  author     git history: the author of the commit that ADDED each src file
-             (login from users.noreply emails when available, else author name)
+  author     git history: the FIRST contributor to land the surviving match for each
+             function (see first_matchers) -- credit follows renames and is not stolen by
+             a later duplicate submission (login from users.noreply emails, else author name)
   project    tools/chaosviewer.config.json (committed branding/prompt config)
 
 Not derivable without the ROM (left to local regens): disasm/callee detail
@@ -44,26 +45,55 @@ def module_label(sym_path: pathlib.Path) -> str | None:
     return m.group(1) if m else None
 
 
-def src_authors() -> dict[str, str]:
-    """{'src/name.c': handle} from the commit that first added each file."""
+def _handle_from(name: str, email: str) -> str:
+    """git identity -> canonical-ish handle: noreply login, else the email local-part
+    (stable across author-name typos, usually equals the GitHub handle), else the name."""
+    email = email.strip()
+    m = LOGIN_RE.match(email)
+    return m.group(1) if m else (email.split("@")[0].lower() or name.strip())
+
+
+def first_matchers() -> dict[str, str]:
+    """{'src/name.ext': handle} crediting each currently-tracked file to the FIRST
+    contributor to land the match it descends from. Credit belongs to whoever matched a
+    function first; a later duplicate submission of the same function does not steal it.
+
+    We replay the whole src/ history oldest-first, tracking one 'origin author' per live
+    path, and follow git's own add / delete / rename classification (-M):
+      * add     -- starts a lineage: the adder owns it (setdefault, so re-processing is safe)
+      * rename  -- CARRIES the origin author to the new path. This is why a maintainer's
+                   mass symbol-rename (func_ovNN_ADDR -> the real _ZN...Ev name) keeps the
+                   original matcher's credit instead of handing it to the renamer.
+      * delete  -- ENDS the lineage. A later add at that path is a fresh match and credits
+                   the new author -- this is the false-match case: a wrong match that was
+                   deleted ('fix the false matches') and later redone correctly by someone
+                   else must credit the person who actually landed the surviving match.
+    The distinction between rename and delete+add is exactly git's content-similarity call,
+    which is what separates 'same match, new name' from 'the first attempt was wrong.'"""
+    # diff.renameLimit=0 lifts the exhaustive-rename cap: the actor-symbol pass renamed
+    # ~2200 files in one commit, far over git's default limit, so without this those renames
+    # degrade to delete+add and the mass-renamer wrongly inherits every matcher's credit.
     out = subprocess.run(
-        ["git", "log", "--diff-filter=A", "--format=%x01%an%x02%ae", "--name-only", "--", "src/"],
+        ["git", "-c", "diff.renameLimit=0", "log", "--reverse", "--diff-filter=ADR", "-M",
+         "--format=%x01%an%x02%ae", "--name-status", "--", "src/"],
         cwd=REPO, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
-    authors: dict[str, str] = {}
+    origin: dict[str, str] = {}   # live path -> author of the earliest add in its lineage
     handle = None
     for line in out.splitlines():
         if line.startswith("\x01"):
             name, _, email = line[1:].partition("\x02")
-            email = email.strip()
-            m = LOGIN_RE.match(email)
-            # identity = noreply login, else the email local-part: stable across
-            # git author-name typos, and usually equals the GitHub handle
-            handle = m.group(1) if m else (email.split("@")[0].lower() or name.strip())
-        elif line.startswith("src/") and handle:
-            # log is newest-first; keep the FIRST seen (most recent add wins
-            # for files that were re-added)
-            authors.setdefault(line.strip(), handle)
-    return authors
+            handle = _handle_from(name, email)
+        elif handle and line and line[0] in "ADR":
+            parts = line.split("\t")
+            code = parts[0]
+            if code.startswith("A") and len(parts) >= 2:
+                origin.setdefault(parts[1].strip(), handle)
+            elif code.startswith("D") and len(parts) >= 2:
+                origin.pop(parts[1].strip(), None)
+            elif code.startswith("R") and len(parts) >= 3:
+                old, new = parts[1].strip(), parts[2].strip()
+                origin[new] = origin.pop(old, handle)  # carry the matcher's credit forward
+    return origin
 
 
 def attribution_overrides() -> dict[str, str]:
@@ -120,7 +150,7 @@ def main():
                 except Exception:
                     continue
 
-    authors = src_authors()
+    firstmatch = first_matchers()        # src path -> first contributor to land the match
     overrides = attribution_overrides()  # manual fixes, highest priority
     aliases = identity_aliases()         # collapse one person's split git identities -> one login
     def canon(login):                    # apply the alias map (idempotent)
@@ -151,7 +181,7 @@ def main():
             if src_path:
                 rec["srcPath"] = src_path
                 if matched:
-                    a = overrides.get(src_path) or authors.get(src_path)
+                    a = overrides.get(src_path) or firstmatch.get(src_path)
                     if a:
                         rec["author"] = canon(a)
             if matched:
@@ -193,10 +223,11 @@ def main():
     tally = collections.Counter(f["author"] for f in functions if f.get("author"))
     contrib = {
         "generatedAt": db["generatedAt"],
-        "note": "Matched functions per contributor (canonical GitHub login). Auto-generated by "
-                "tools/chaos_db_ci.py from committed matches, git-add authors, attribution.json "
-                "aliases (collapse split identities) + overrides. Do not hand-edit; fix names in "
-                "attribution.json instead.",
+        "note": "Matched functions per contributor (canonical GitHub login), credited to whoever "
+                "landed each match FIRST (credit follows renames; a later duplicate match does not "
+                "steal it). Auto-generated by tools/chaos_db_ci.py from committed matches, git "
+                "history, attribution.json aliases (collapse split identities) + overrides. Do not "
+                "hand-edit; fix names in attribution.json instead.",
         "totalMatched": matched_n,
         "contributors": [{"login": who, "matched": n} for who, n in tally.most_common()],
     }
