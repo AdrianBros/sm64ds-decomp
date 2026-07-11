@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: extra logic (you do more) (div=15). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 struct Vec3 { int x, y, z; };
 extern "C" {
 extern void func_0203cd80(struct Vec3 *v, int a);
@@ -14,6 +11,15 @@ void func_ov006_020c3bf4(void *self);
 }
 
 struct M48 { int w[12]; };
+
+struct Obj {
+    virtual void f0() = 0;
+    virtual void f1() = 0;
+    virtual void f2() = 0;
+    virtual void f3() = 0;
+    virtual void f4() = 0;
+    virtual void f5(int a) = 0;
+};
 
 void func_ov006_020c3bf4(void *self)
 {
@@ -38,16 +44,14 @@ void func_ov006_020c3bf4(void *self)
 
     *(struct M48*)(c + 0xd34) = *(struct M48*)data_ov006_0213aee8;
 
-    {
-        void **o = (void**)(c + 0xd18);
-        (*(void(***)(void*, int))o)[5]((void*)o, 0);
-    }
+    ((Obj*)(c + 0xd18))->f5(0);
 
+    i = 0;
     {
         char *p = c + 8;
-        for (i = 0; i < 0x16; i++) {
-            if (*(int*)(c + 0x48) == 0) break;
-            func_ov006_020c35a8(p);
+        for (; i < 0x16; i++) {
+            if (*(int*)(c + 0x48) != 0)
+                func_ov006_020c35a8(p);
             c += 0x98;
             p += 0x98;
         }

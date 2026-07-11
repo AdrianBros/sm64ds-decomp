@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: different op / idiom (div=8). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 typedef int Fix12i;
 struct Vector3 { Fix12i x, y, z; };
 struct BCA_File;
@@ -28,7 +25,7 @@ void func_ov080_02123924(char* c){
         struct Vector3 v;
         Fix12i* q;
         if (p == 0) return;
-        q = (Fix12i*)(p + 0x5c);
+        q = (Fix12i*)(((int)p + 0x5c) & 0xFFFFFFFFFFFFFFFFLL);
         v.x = q[0];
         v.y = q[1];
         v.z = q[2];
