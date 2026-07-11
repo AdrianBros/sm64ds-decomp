@@ -1,7 +1,4 @@
 //cpp
-// NONMATCHING: register allocation (div=18). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
 struct C;
 typedef void (C::*PMF)();
 struct C {
@@ -13,6 +10,7 @@ extern void func_ov002_020af4ec(char* c);
 extern void _ZN12CylinderClsn5ClearEv(char* c);
 extern void _ZN12CylinderClsn6UpdateEv(char* c);
 extern PMF data_ov002_0210dc00[];
+#define AT(p, off) ((void*)(int)(((long long)(int)((char*)(p) + (off))) & 0xFFFFFFFFFFFFFFFFLL))
 int _ZN13OneUpMushroom8BehaviorEv(char* c){
   if(_ZN5Enemy14UpdateYoshiEatER12WithMeshClsn(c, c+0x144) != 0){
     func_ov002_020af4ec(c);
@@ -24,10 +22,10 @@ int _ZN13OneUpMushroom8BehaviorEv(char* c){
     int old = *(int*)(c+0x388);
     C* self = (C*)c;
     (self->*data_ov002_0210dc00[*(int*)(c+0x384)])();
-    ++*(unsigned short*)(c+0x100);
-    ++*(unsigned short*)(c+0x38c);
+    ++*(unsigned short*)AT(c, 0x100);
+    ++*(unsigned short*)AT(c, 0x38c);
     if(old != *(int*)(c+0x388)){
-      *(unsigned short*)(c+0x100) = 0;
+      *(unsigned short*)AT(c, 0x100) = 0;
       *(unsigned short*)(c+0x300+0x8c) = 0;
     }
   }

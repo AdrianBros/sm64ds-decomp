@@ -1,35 +1,24 @@
 //cpp
-// NONMATCHING: base materialization / addressing (div=23). Logic verified correct vs ROM; not
-// byte-matchable from C at mwccarm 1.2/sp2p3 (see notes/matching-style.md).
-// Counts as decompiled, not matched.
+struct C { char pad[4]; };
+typedef void (C::*PMF)();
 extern "C" {
 extern int _ZN9Animation7AdvanceEv(void*);
 extern void func_ov006_020e7818(void*);
 extern void* _ZN8Particle6System3NewEjj5Fix12IiES2_S2_PK11Vector3_16fPNS_8CallbackE(unsigned int, unsigned int, int, int, int, const void*, void*);
 extern int data_ov006_0213c704[2];
 
-typedef void (*VoidFn)();
+#define AT(p, off) ((void*)(int)(((long long)(int)((char*)(p) + (off))) & 0xFFFFFFFFFFFFFFFFLL))
 
 void func_ov006_020e7be8(char* c)
 {
+    int* p = (int*)AT(c, 0x210);
     int* d = data_ov006_0213c704;
-    int* p = (int*)(c + 0x210);
-    if (p[0] == d[0] && p[1] == d[1]) return;
-
-    if (*(int*)(c + 0x210) == 0) return;
-
-    {
-        int idx = *(int*)(c + 0x214);
-        char* obj = c + (idx >> 1);
-        VoidFn fn;
-        if (idx & 1) {
-            char* vt = *(char**)obj;
-            fn = *(VoidFn*)(vt + *(int*)(c + 0x210));
-        } else {
-            fn = *(VoidFn*)(c + 0x210);
-        }
-        fn();
+    if (p[0] == d[0]) {
+        if (p[1] == d[1]) return;
+        if (*(int*)(c + 0x210) == 0) return;
     }
+
+    (((C*)c)->**(PMF*)(c + 0x210))();
 
     _ZN9Animation7AdvanceEv(c + 0x5c);
     func_ov006_020e7818(c + 0x84);
