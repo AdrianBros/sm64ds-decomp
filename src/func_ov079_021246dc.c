@@ -9,7 +9,7 @@ extern void Sound_StopLoadedMusic_Layer3(void);
 extern void func_02011cfc(void);
 extern void func_ov079_02123d4c(Vec3 *out, void *actor);
 extern void Actor_TriplePoofDustAt(void *actor, const Vec3 *p);
-extern void Particle_System_NewSimple(unsigned int a, int x, int y, int z);
+extern void _ZN8Particle6System9NewSimpleEj5Fix12IiES2_S2_(unsigned int a, int x, int y, int z);
 extern void Actor_UntrackAndSpawnStar(void *actor, signed char *flag, unsigned int id, const Vec3 *pos, unsigned int j);
 extern int MeshColliderBase_IsEnabled(void *self);
 extern void MeshColliderBase_Disable(void *self);
@@ -79,7 +79,7 @@ void func_ov079_021246dc(void *thiz)
             dp.y = v.y;
             dp.z = v.z;
             Actor_TriplePoofDustAt(c, &dp);
-            Particle_System_NewSimple(4, v.x, v.y, v.z);
+            _ZN8Particle6System9NewSimpleEj5Fix12IiES2_S2_(4, v.x, v.y, v.z);
             *(unsigned char *)(c + 0x404) = 0;
             Actor_UntrackAndSpawnStar(c, (signed char *)(c + 0x408), *(unsigned char *)(c + 0x409), &starPos, 4);
             if (MeshColliderBase_IsEnabled(c + 0x418) != 0)
@@ -95,7 +95,7 @@ void func_ov079_021246dc(void *thiz)
         dp2.y = v2.y;
         dp2.z = v2.z;
         Actor_PoofDustAt(c, &dp2);
-        Particle_System_NewSimple(5, v2.x, v2.y, v2.z);
+        _ZN8Particle6System9NewSimpleEj5Fix12IiES2_S2_(5, v2.x, v2.y, v2.z);
         ActorBase_MarkForDestruction(c);
     }
 }
