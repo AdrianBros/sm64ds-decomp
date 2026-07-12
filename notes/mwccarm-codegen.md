@@ -610,6 +610,34 @@ Cracked `_ZN10SphereClsn10DetectClsnEv` (SphereClsn::DetectClsn, div 16 -> 0, Fa
 floor - the plain floor (register-coloring swap with NO virtual call feeding it) is
 still unreachable and should still be parked.
 
+**Confirmed NOT applicable (2026-07-11), but see 6m:** a symmetric `sb`/`sl`
+(dst-temp/src-temp) coloring swap in an inlined `ldm!/stm!` aggregate-copy loop with
+NO call in the loop body - mwccarm invariantly assigns dst-temp to `sb`, src-temp to
+`sl` regardless of decl order, block-scoped temps, array-subscript form, reference
+binding, or a fake-dependency ternary; applying the 6i call-result scoping trick here
+made it WORSE (div 8 -> 20). Do not retry 6i on a writeback-temp swap with no
+intervening call - the lever that DOES flip it is u64-laundering the DST deref (6m).
+(`func_ov055_02111358` / `_ZN11MirrorLuigi6RenderEv`, Opus reached div 13 -> 8 via
+decl reorder (i first, dst before src) fixing the OUTER counter/pointer coloring;
+Fable exhausted 8 attempts on the residual inner sb/sl swap; later cracked to a full
+MATCH via 6m.)
+
+**Follow-up (2026-07-11, func_ov090_02130f94 MATCHED, div 48 -> 0):** the only other
+ROM instance of the `mov sl,rSRC / mov lr,rDST / ldm sl!/stm sb!` writeback-temp shape
+needed NO copy-temp intervention at all - a plain `global = *src;` aggregate assign
+colored sb/sl/lr correctly on the first try. The real walls were elsewhere, and the fix
+generalizes: when the target loop has BOTH a surviving multiplicative induction counter
+(`add r4,r4,#3` feeding an mla) AND a scaled access that is NOT reduced (`add
+r0,r7,r6,lsl #2` recomputed on both sides of a call instead of a `+=4` induction var +
+cross-call CSE), turn BOTH `#pragma opt_strength_reduction off` and `#pragma
+opt_common_subs off` on and hand-write the surviving counter as an explicit variable
+(`idx = 6; ... idx += 3;` in the loop) so it outlives the pragma. Either pragma alone
+made it worse (53/14 div); together with the explicit counter: div 6. The last 6 words
+were the 3-word `v = r;` struct copy: struct assign emits ldm/stm (wrong), int temps
+extend live ranges and reorder the loads (wrong); plain per-field `v.x = r.x; v.y =
+r.y; v.z = r.z;` under `opt_common_subs off` emits the batched 3-load/3-store shape
+byte-exact, including reusing the r.z load (r3) for a later stack arg.
+
 ## 6j. Array-subscript indexing defeats a LICM index*scale hoist under EBB-local CSE (2026-07-10)
 
 Companion to 6e's `#pragma opt_common_subs off` master lever. Once the pragma flips CSE
@@ -673,7 +701,31 @@ fixed-point sin/cos matrix-build blocks (func_0204be40, func_0204bbd8), and an
 in a different but semantically-free order (func_02071d3c) - a sibling of the 6e/6g
 ordering floors, unmoved by decl-order permutation.
 
-## 7. Workflow implications
+## 6m. u64-laundering the DST deref flips the aggregate-copy writeback-temp swap (2026-07-11)
+
+The "genuine plain floor" 6i warned about - the symmetric `sb`/`sl` src-temp/dst-temp
+coloring swap in an inlined `ldm!/stm!` aggregate-copy loop with no call in the body -
+is NOT a floor. Laundering the destination pointer through the u64 round-trip flips it:
+
+```c
+/* compiler emits mov sl,<src> / mov sb,<dst> (src-temp gets the HIGHER reg): */
+*dst = *src;
+/* compiler emits mov sb,<src> / mov sl,<dst> (src-temp gets the LOWER reg): */
+*(Mtx*)(int)(((long long)(int)dst) & 0xFFFFFFFFFFFFFFFFLL) = *src;
+```
+
+The laundered dst expression delays the LHS address-temp's vreg creation past the RHS,
+inverting which temp the allocator hands the lower callee-saved register. Everything
+else (loop structure, running-pointer strength reduction, increment scheduling) is
+untouched. Simpler complexity-adders do NOT work - `(int)`, `(char*)`, `(unsigned int)`
+casts and `+ 0` all fold away before allocation; only the full u64 mask round-trip
+(the same laundering idiom as 6h/6j) survives long enough. Laundering the SRC side
+instead does nothing.
+
+Cracked `_ZN11MirrorLuigi6RenderEv` (ov055, div 8 -> MATCH, one shot after a 9-variant
+battery; also the only other instance of this shape in the ROM, `func_ov090_02130f94`,
+is parked on the same swap - retry it with this lever). Try 6m FIRST when the residual
+divergence is exactly the `mov/mov/ldm!/stm!` register pair of a struct-copy loop.
 
 - **Free tiers first, every cycle:** `clone.py --apply` (byte-identical retarget) then
   `paramclone.py --apply` (same skeleton, substituted immediates) - they harvest the families
@@ -684,6 +736,122 @@ ordering floors, unmoved by decl-order permutation.
   whole template tier was built and it's the cheapest way to lower difficulty in bulk.
 - **The oracle stays.** Understanding shrinks the number of compile-and-check iterations; it
   never removes the check. "Matched" means the bytes are identical, full stop.
+
+## 6n. ov092 near-miss session levers (2026-07-11)
+
+Three parked "not reachable from C" regalloc near-misses cracked byte-exact
+(func_ov092_021316d8, func_ov092_021311b0, func_ov092_02131010). New rules:
+
+- **Spell shift-chains as the CAST they came from.** A `lsl #28 / asr #16 / lsl #16 /
+  lsr #16 / asr #4 / lsl #2` index chain written as five explicit shift statements
+  mis-colors the whole downstream expression (table pointer / pool const / sum swap
+  registers, killing an r5 spill the ROM has). Written as the source-level casts -
+  `s16 t = (s16)((raw + 1) << 12); idx = ((u16)t >> 4) * 2;` with an element index -
+  the same instructions come out AND the register story matches (fixed the push set
+  and frame offset for free). Manual shift-spelling is semantically equal but
+  allocates differently (func_ov092_021316d8).
+- **When the ROM predicates one if/else arm, make THAT arm the `else`.** mwccarm
+  if-converts the ELSE arm (predicated body + `bge` over it) and branches the THEN
+  arm. `if (k >= 0) {A} else {B}` emitted blt/branch shape across every spelling of
+  A; `if (k < 0) {B} else {A}` predicated A (5 insns: lslge/ldrshge/ldrshge/addge/
+  strhge) on first try. Pair with a named temp for the RMW load (`s16 t = ang[k];
+  ang[k] = (s16)(t + a4);`) to order the table load before the stack-arg reload
+  (func_ov092_021316d8).
+- **Compound `+=` vs explicit `=` on laundered-pointer RMWs is a coloring lever.**
+  Three 6g-laundered halfword pointers + a named base: `*p = (s16)(*p + base[i])`
+  colors the pointers r3/lr/ip with temp r2; `*p += base[i]` colors them ip/r2/lr
+  with temp r3 (the ROM's). The compound form also flips which `add` is emitted
+  first (RHS base add before LHS pointer add); if the ROM wants the LHS add first,
+  re-derive the base INLINE per statement (`((s16 *)(c + 0x400))[i]` each time, no
+  named base local) - CSE still merges to one add but generation order follows the
+  LHS (found by the permuter on func_ov092_021311b0, reproduced by hand on
+  func_ov092_02131010's zero-block: inline re-deref fixed a 3-way rotation there too).
+- **Write-only shadow struct: `volatile` + named scalar locals.** When the ROM keeps
+  a stack object whose stores are all dead (a "tmp" vector built, adjusted, then
+  copied on to a second vector from REGISTERS), every plain aggregate spelling
+  (struct assign, int[3], field-wise) gets fully scalar-replaced and the frame
+  shrinks. The shape that matches: `volatile Vector3 tmp;` + plain named ints
+  (`x = load; tmp.x = x; ... y = y - K; tmp.y = y; dust.x = x; ...`) - volatile
+  retains every store in source order, the named locals keep the values in
+  registers for the second copy, and no volatile READ is ever emitted because the
+  source never reads tmp back (func_ov092_02131010, the "LandingDust double-store").
+- **Stack layout is declaration order, low to high** (volatile arrays and structs
+  included): `saved[3]` then `v1` then `v2` lands sp+0 / sp+0xc / sp+0x18
+  (func_ov092_021311b0; confirmed again on func_ov092_02131010's tmp/eq/dust).
+- **Friendly extern aliases read BLIND in linkcheck.** `Particle_System_NewSimple`
+  compiled fine but linkcheck could not resolve it; the config symbol is
+  `_ZN8Particle6System9NewSimpleEj5Fix12IiES2_S2_` (0x02022e98). Use the mangled
+  name from config/arm9/symbols.txt in new sources (same lesson as the division
+  `_u32_div_f` aliases).
+- **2-instruction scheduler-order residuals ARE permuter-crackable.** The "ordering
+  floor" note (cond-move polarity, store batching) does not extend to adjacent
+  independent-instruction swaps: the permuter flipped one instantly on
+  func_ov092_021311b0 (its mutation: inline the base re-deref). Route 2-div
+  add/add or mov/str swaps to the permuter before calling floor.
+
+## 6o. Ordering-residual triage: five levers, four true floors (2026-07-11)
+
+Adversarial triage of every pure instruction-reorder near-miss in the DB (identical
+instruction multiset, order-only diff, div<=12: 16 candidates after dropping 5 ghost
+entries; one prober + one skeptic per function, ~40 spellings each): 6 cracked
+byte-exact, 4 verified floor. The crack levers:
+
+- **goto-pinned early-return flips cond-move PAIR order.** `return r == 2;` and every
+  inversion spelling (`!(r!=2)`, ternaries both ways, if/else both polarities, named
+  temps, xor/sub forms) canonicalize to moveq-first; the ROM wanted movne-first.
+  `if (r == 2) goto yes; return 0; yes: return 1;` pins block layout so if-conversion
+  predicates in layout order - byte-exact (func_0203faa8, previously survived ~8k
+  permuter iterations). The goto is load-bearing: `if (r != 2) return 0; return 1;`
+  canonicalizes back.
+- **0/1 selects emit the TRUE arm first, and {0,1} INT arms canonicalize to
+  bool(!=0)** (extends 6c), so movne-first is immovable in int spellings. Pointer-typed
+  arms dodge the canonicalization while still folding to immediate movs:
+  `(int)((x == 0) ? (char *)0 : (char *)1)` pins cmp/moveq#0/movne#1
+  (func_ov007_020b91b4).
+- **Equal-arm ternary on a call argument flips arg emission order.**
+  `f(0x78, id ? c + 0x74 : c + 0x74)` (id provably nonzero, arms identical - folds to
+  one add, no cmp) makes the const arg emit FIRST (mov before add = ROM order) with
+  zero other byte changes (func_ov079_02126a84). Wrap the argument whose setup must
+  move LATER; wrapping the other argument is inert. The same identical-arm select on a
+  table pointer flips ldr-over-mov promotion on _ZN3HUD13InitResourcesEv but couples
+  there (a strh stops sinking) - lever real, that function still open.
+- **Loads-before-stores batching fires only in the ELSE arm.** Inverting a guard so
+  the store+call arm becomes else (`==0` -> `!=0`, arms swapped) stopped a pool ldr
+  from hoisting over a strb; the predicated short-arm bytes are identical either way
+  (func_ov079_02126164). Same family: a default-arm guard spelled
+  `if (x == 0) { ...; break; } return;` instead of `if (x != 0) return; ...`
+  suppressed a pool-ldr hoist over a strh (func_ov004_020b3278).
+- **volatile on a PAIR of adjacent stores un-freezes the pool-ldr batch order.**
+  mwccarm otherwise batches all tail-block pool loads up front in a fixed internal
+  order; volatile-qualifying the two stores dropped strh/orr into their ROM slots
+  cleanly, 8 -> 6 divergences (func_0205fb58, still open).
+- **Don't hand-expand what the compiler synthesizes.** A hand-expanded signed `/2`
+  (add/lsr#31/asr#1 written out) pinned a byte store where written; the natural `/ 2`
+  spelling regenerates the identical sequence and self-schedules the store into the
+  ROM slot (func_ov095_021365d8).
+
+What survived BOTH prober and skeptic - marked `floor(ordering)` in nearmiss/db.jsonl
+(nearmiss_db.py mark-floor / unmark-floor; excluded from export-close and refine_wl):
+
+- speculative stall-slot fill across a bne: OUR compile hoists a loop-counter init
+  into a load-use gap, the ROM does not, and no spelling suppresses the hoist
+  (func_ov006_020dac34);
+- one-slot load-delay-slot fill (add-vs-str swap after a pool ldr): C++ frontend
+  compiles the whole function byte-identical, comma-sequencing the store into the
+  RMW statement is invisible to the scheduler (func_ov060_02113740);
+- fixed call-arg pool-ldr hoist distance: always 3 slots above the bl in every intact
+  spelling, ROM shows 1 (func_ov006_0211dad0);
+- position-dependent final-block scheduler state: the byte-identical C spelling
+  MATCHES in the function's first arm and diverges in the last block before the
+  literal pool (func_ov006_020fb230);
+- Stage::PS_Update's case-1 preheader independent-ldr pair (see that file's header).
+
+Caveats from this run: two initial floor verdicts fell to the skeptic's fresh lever
+families, and 6n's permuter result cracked a third ordering shape - treat
+floor(ordering) as "no known lever", not "impossible", and unmark when a new family
+lands. Mechanics: match.py diff columns are LEFT=ROM / RIGHT=candidate (two probers
+misread this and inverted their narrative); the DB's div is sequence edit-distance,
+not the raw MISMATCH line count (a 1-slot displacement can print 9 lines).
 
 ## 8. The `asm`-block escape hatch (for hand-written-asm SDK primitives)
 
