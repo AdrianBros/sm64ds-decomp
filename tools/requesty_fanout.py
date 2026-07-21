@@ -20,7 +20,12 @@ Usage:
   REQUESTY_API_KEY=... python tools/requesty_fanout.py --wl <wl> --out <out> [--attempts 6] [--jobs 1]
   python tools/crackloop.py land --output <out> --refine
 """
-import argparse, concurrent.futures, json, os, pathlib, re, subprocess, sys, tempfile, time
+import argparse, concurrent.futures, json, os, pathlib, re, subprocess, sys, tempfile, threading, time
+
+# Every model streams into one stdout; tag each line ⟦model⟧ so the console can split the interleaved
+# fan-out into a readable per-model tab. Held while writing a whole line so tags never split mid-line.
+_TAG_OPEN, _TAG_CLOSE = "⟦", "⟧"  # ⟦ ⟧
+_emit_lock = threading.Lock()
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 PY = sys.executable
@@ -60,8 +65,19 @@ def run_model(model, wl, attempts, jobs, key):
            "--attempts", str(attempts), "--jobs", str(jobs),
            # Under the gitignored _abwork/ so per-model scratch never shows up as untracked files.
            "--no-claims", "--workdir", f"_abwork/rqsty_{_slug(model)}"]
+    prefix = f"{_TAG_OPEN}{model}{_TAG_CLOSE} "
     try:
-        subprocess.run(cmd, cwd=REPO, env=env, timeout=60 * 60)
+        # Stream child stdout line-by-line, tagging each so the console can route it to this model's
+        # tab. Python is unbuffered here (PYTHONUNBUFFERED) so lines arrive as glm_refine emits them.
+        env["PYTHONUNBUFFERED"] = "1"
+        proc = subprocess.Popen(cmd, cwd=REPO, env=env, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                                errors="replace", bufsize=1)
+        for line in proc.stdout:
+            with _emit_lock:
+                sys.stdout.write((prefix + line) if line.strip() else line)
+                sys.stdout.flush()
+        proc.wait(timeout=60 * 60)
     except Exception as e:
         print(f"[fanout] {model}: run failed - {str(e)[:120]}", flush=True)
         return None
