@@ -542,8 +542,13 @@ def _write_output(path, results, tin, tout):
         "results": [{"name": r["name"], "matched": r["matched"], "attempts": r["attempts"],
                      "divergences": r["divergences"], "note": r["note"]} for r in results],
         "sources": {r["name"]: r["c_source"] for r in landed if r["c_source"]},
+        # Only COMPILING drafts are worth banking. divergences==999 is the verifier's "no
+        # divergence count" sentinel: the draft did not compile, so its c_source is not a usable
+        # near-miss - banking it would just add non-reproducing noise to the DB. A draft that
+        # compiled (div < 999), even a loose one, is real progress from nothing and is saved.
         "nearMisses": [{"name": r["name"], "c_source": r["c_source"]}
-                       for r in results if not r["matched"] and r["c_source"]],
+                       for r in results
+                       if not r["matched"] and r["c_source"] and r["divergences"] < 999],
     }
     pathlib.Path(path).write_text(json.dumps(out, indent=1), encoding="utf-8")
 
