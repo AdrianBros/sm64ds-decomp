@@ -22,6 +22,16 @@ Usage:
 """
 import argparse, concurrent.futures, json, os, pathlib, re, subprocess, sys, tempfile, threading, time
 
+# Write UTF-8 no matter the OS codepage. Windows Python defaults stdout to cp1252, which can't encode
+# the ⟦ tag (or any non-latin1 char a model emits) and raises UnicodeEncodeError - the "'charmap'
+# codec can't encode '⟦'" crash that killed every model. errors='replace' keeps a stray odd byte
+# from ever sinking a run. The console reads this stream as UTF-8, so the tags arrive intact.
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # Every model streams into one stdout; tag each line ⟦model⟧ so the console can split the interleaved
 # fan-out into a readable per-model tab. Held while writing a whole line so tags never split mid-line.
 _TAG_OPEN, _TAG_CLOSE = "⟦", "⟧"  # ⟦ ⟧
@@ -68,8 +78,10 @@ def run_model(model, wl, attempts, jobs, key):
     prefix = f"{_TAG_OPEN}{model}{_TAG_CLOSE} "
     try:
         # Stream child stdout line-by-line, tagging each so the console can route it to this model's
-        # tab. Python is unbuffered here (PYTHONUNBUFFERED) so lines arrive as glm_refine emits them.
+        # tab. Unbuffered so lines arrive live; UTF-8 so a model's non-latin1 reasoning can't crash
+        # glm_refine's own stdout before we ever read it (same cp1252 trap as above).
         env["PYTHONUNBUFFERED"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
         proc = subprocess.Popen(cmd, cwd=REPO, env=env, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True, encoding="utf-8",
                                 errors="replace", bufsize=1)
