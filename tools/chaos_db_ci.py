@@ -96,6 +96,45 @@ def first_matchers() -> dict[str, str]:
     return origin
 
 
+def match_finishers() -> dict[str, str]:
+    """{'src/name.ext': handle} crediting whoever turned a NONMATCHING draft into a real
+    byte-match -- the person who actually FINISHED the function.
+
+    first_matchers() only sees add/delete/rename, so closing out a draft lands as a plain
+    MODIFY and credits nobody: the original draft's author kept the credit and the matcher
+    got zero. That is backwards for the refine tier, where converting a near-miss into a
+    byte-identical match is the hard part of the work.
+
+    A finish is identified by content, not by message: the file carried the "// NONMATCHING"
+    banner before the commit and does not after. Only commits that touch that banner are
+    inspected (-G), so this is a few hundred blobs, not the whole history. Oldest-first, so
+    if a file is re-drafted and re-finished later, the LAST finisher wins."""
+    out = subprocess.run(
+        ["git", "log", "--reverse", "-G", "// NONMATCHING", "--diff-filter=M",
+         "--format=%x01%H%x02%an%x03%ae", "--name-only", "--", "src/"],
+        cwd=REPO, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+    finishers: dict[str, str] = {}
+    sha = handle = None
+    for line in out.splitlines():
+        if line.startswith("\x01"):
+            sha, _, who = line[1:].partition("\x02")
+            name, _, email = who.partition("\x03")
+            handle = _handle_from(name, email)
+        elif handle and sha and line.strip().startswith("src/"):
+            path = line.strip()
+            after = subprocess.run(["git", "show", f"{sha}:{path}"], cwd=REPO,
+                                   capture_output=True, text=True, encoding="utf-8",
+                                   errors="replace").stdout[:200]
+            if "// NONMATCHING" in after:
+                continue                      # still a draft after this commit
+            before = subprocess.run(["git", "show", f"{sha}^:{path}"], cwd=REPO,
+                                    capture_output=True, text=True, encoding="utf-8",
+                                    errors="replace").stdout[:200]
+            if "// NONMATCHING" in before:    # banner was there, now gone -> this commit finished it
+                finishers[path] = handle
+    return finishers
+
+
 def attribution_overrides() -> dict[str, str]:
     """Manual {'src/name.c': github_login} for matches the git-add author gets wrong -- e.g. a
     contributor's work that landed via a maintainer's consolidating PR/squash, which records the
@@ -150,6 +189,7 @@ def main():
                 except Exception:
                     continue
 
+    finishers = match_finishers()        # src path -> who turned the draft into a real match
     firstmatch = first_matchers()        # src path -> first contributor to land the match
     overrides = attribution_overrides()  # manual fixes, highest priority
     aliases = identity_aliases()         # collapse one person's split git identities -> one login
@@ -181,7 +221,10 @@ def main():
             if src_path:
                 rec["srcPath"] = src_path
                 if matched:
-                    a = overrides.get(src_path) or firstmatch.get(src_path)
+                    # Priority: manual override > whoever FINISHED the match (turned the
+                    # NONMATCHING draft byte-identical) > whoever first added the file.
+                    a = (overrides.get(src_path) or finishers.get(src_path)
+                         or firstmatch.get(src_path))
                     if a:
                         rec["author"] = canon(a)
             if matched:
