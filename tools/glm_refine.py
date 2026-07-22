@@ -215,6 +215,12 @@ def chat(messages, max_tokens=8000, retries=RETRIES, on_delta=None):
         if "reason" in MODEL.lower() or is_nemo:
             mt = max(mt, 24000)
         body = {"model": MODEL, "max_tokens": mt, "messages": messages}
+        # OpenAI's reasoning models take the effort as `reasoning_effort` (minimal|low|medium|high)
+        # rather than a thinking budget. Only sent for models that actually accept it - other
+        # OpenAI-dialect hosts (DeepSeek, Kimi, Requesty's free pool) 400 on an unknown field; the
+        # 400 handler below drops it and retries, so a wrong guess costs one retry, not the run.
+        if EFFORT and EFFORT != "off" and re.match(r"^(gpt-5|o[1-4])", MODEL.lower()):
+            body["reasoning_effort"] = EFFORT
         if stream:
             body["stream"] = True
             body["stream_options"] = {"include_usage": True}  # usage rides the final chunk
@@ -266,6 +272,10 @@ def chat(messages, max_tokens=8000, retries=RETRIES, on_delta=None):
         # Model rejected the reasoning param -> drop it and retry without extended thinking.
         if r.status_code == 400 and "thinking" in body:
             body.pop("thinking", None); body.pop("temperature", None); continue
+        # Same for the OpenAI-dialect reasoning knob: a host that doesn't take reasoning_effort
+        # 400s on the unknown field, so drop it and retry plain rather than failing the function.
+        if r.status_code == 400 and "reasoning_effort" in body:
+            body.pop("reasoning_effort", None); continue
         raise RuntimeError(f"GLM API {r.status_code}: {r.text[:300]}")
     raise RuntimeError("GLM API: rate-limited, retries exhausted")
 
