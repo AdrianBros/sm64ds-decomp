@@ -14,8 +14,8 @@ New here? Start with **[CONTRIBUTING.md](CONTRIBUTING.md)**, coordinate work in
 
 <!-- progress:start -->
 ```
-Functions  ████████████████████████████░░  93.9%   10,656 / 11,348
-Code size  ████████████████████████░░░░░░  80.3%   1,775,536 / 2,211,124 bytes
+Functions  ████████████████████████████░░  93.9%   10,658 / 11,348
+Code size  ████████████████████████░░░░░░  80.3%   1,776,484 / 2,211,124 bytes
 ```
 <!-- progress:end -->
 
