@@ -18,6 +18,7 @@ it is fair to take over: ping the claimant first.
 ## Claims
 
 | Range | Who | Claimed | Status |
+| ov006 func_ov006_02106fdc (0x02106fdc, size 0xc0) | lunavyqo (Grok) | 2026-07-22 | near-miss — div=9 (r8/sb regperm floor); draft banked in nearmiss/db.jsonl (PR #588 closed: near-miss drafts belong in the DB, not src/) |
 | arm9 func_0205fb58 (0x0205fb58, size 0x78) | lunavyqo (Grok) | 2026-07-22 | **done** — verified byte-identical (mwccarm 1.2/sp2p3); PR #580 |
 | arm9 func_02068398 (0x02068398, size 0x78) | lunavyqo (Grok) | 2026-07-22 | **done** — verified byte-identical (mwccarm 1.2/sp2p3); PR #577 |
 | ov002 EnemySwitchTag::Behavior / _ZN14EnemySwitchTag8BehaviorEv (0x020f19fc, size 0xc8) | lunavyqo (Grok) | 2026-07-22 | **done** — verified byte-identical (mwccarm 1.2/sp2p3); PR #585 |
@@ -63,7 +64,7 @@ it is fair to take over: ping the claimant first.
 | ov071 _ZN6Coffin8BehaviorEv (0x021224cc, size 0x90) | Codex/Lovelace | 2026-07-16 | done — 144-byte exact match, strict relocs + linkcheck VERIFIED; PR #371 |
 | ov074 _ZN8Goomboss16CleanupResourcesEv (0x02121abc, size 0xb4) | Codex/Mendel | 2026-07-16 | done — 180-byte exact match, strict relocs + linkcheck VERIFIED; PR #373 |
 | ov060 func_ov060_021151d4 (0x021151d4, size 0x140) | Codex | 2026-07-16 | released — existing DB-best div=3 confirmed materialized-base floor; no tracked source change |
-| ov095: func_ov095_021357d8 (0x021357d8), func_ov095_021358cc (0x021358cc), func_ov095_02135cdc (0x02135cdc), UpDownLiftBbh::InitResources (0x021365d8), Flamethrower::Behavior (0x021368f0), Flamethrower::InitResources (0x02136d60) | lunavyqo | 2026-07-12 | done (partial) — 357d8 + UpDownLift InitResources MATCH (PR #305); 35cdc near-miss div≈40 in DB; 358cc/Flamethrower still open |
+| ov095: func_ov095_021357d8 (0x021357d8), func_ov095_021358cc (0x021358cc), func_ov095_02135cdc (0x02135cdc), UpDownLiftBbh::InitResources (0x021365d8), Flamethrower::Behavior (0x021368f0), Flamethrower::InitResources (0x02136d60) | lunavyqo | 2026-07-12 | done (partial) — 357d8 + UpDownLift InitResources MATCH (PR #305); 35cdc **MATCH** (PR #596, hand-asm: scheduling floor); 358cc/Flamethrower still open |
 | ov019 func_ov019_02111558 (0x02111558, size 0x1fc) | lunavyqo | 2026-07-12 | done - verified byte-identical, draft PR |
 | _example: ov004 0x020b0000-0x020b8000_ | _handle_ | _2026-06-17_ | _example_ |
 | ov029 8 funcs (0x02111254-0x02112354) | lunavyqo | 2026-07-10 | done - verified byte-identical, PR #221 open |
