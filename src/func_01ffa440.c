@@ -32,6 +32,14 @@
 // matches how src/func_01ff9378.c and src/func_01ffa594.c are already carried -- byte-
 // matched sources that the ROM build takes from the gap object.
 //
+// The same two names are also why `tools/eligible.py` classifies this file
+// "unresolvable": its rule 5 requires every undefined reference to name a symbol that
+// config/**/symbols.txt defines, and neither address has a row, for the reason above.
+// What that rule is guarding against does not apply here -- `tools/linkcheck.py --name
+// func_01ffa440` resolves both branches by address and reports VERIFIED with 0 blind
+// words, so every byte of both targets is checked against the ROM. They are simply
+// unnamed, which is why the file records the routine rather than building it.
+//
 // The argument registers are pushed across the call as they are in every other routine in
 // this block, which is the tell that these are one hand-written assembly file.
 
