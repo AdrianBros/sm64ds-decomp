@@ -7008,3 +7008,81 @@ refuse it and should. RECOMMENDATION, accepted by the coordinator: stop re-queue
 It needs the ROM's own compiler (CW NITRO V0.6.1, 6ah, unarchived) or a construct 6bs says
 does not exist.
 
+
+## 6ct. A value assigned to a variable the optimiser will not propagate gets its own colour, and that is the handle 6cq said did not exist: func_ov075_0211afb0 MATCHED (div 4 -> 0, 2026-09-13, run link100 wave 11 lane WALL-B)
+
+`func_ov075_0211afb0` (ov075 0x0211afb0, 0x21c) sat at four words for three campaigns
+(6bm, 6bn, 6cq: ~260,000 compiles, five permuter seeds, the full pragma vocabulary, every
+declaration rank x type name product, 840 statement orders, 25 builds). The residue was one
+colouring decision in the second vertex emission: the ROM emits `lsl sb,r0,#9` where every
+build we own emits `lsl r0,r0,#9`, because 2004/b56 puts `vx << 9` into the register of `vx`,
+which dies at that instruction, and the ROM's compiler takes the register freed one
+instruction earlier. It is byte-exact now, under the build's own flags, with two spellings
+inside the emission block and nothing else changed:
+
+```c
+                    vx = *(int *)(base + off1);
+                    sz = *(int *)(p1 + 8);      /* z loaded INTO the destination local */
+                    cols = vx << 9;             /* x << 9 parked in the loop bound      */
+                    sx = cols >> 16;
+                    sz = (sz << 9) >> 16;       /* and shifted in place                */
+```
+
+`cols` is the inner loop's bound, reloaded from `self[0xa7]` at the loop tail before its
+next use, so parking a value in it between the two is semantically free. Both emissions
+are spelt the same way (the symmetric form matches as well as the block-B-only form).
+
+**The mechanism, measured.** Assigning `vx << 9` to a variable does nothing when the
+variable is a plain local: the optimiser propagates it into the expression and the shift
+result coalesces in place with `vx` (6cq's 714 named-intermediate cells; here: fresh
+`x9` at any rank, `register int x9`, `sx = (x9 = vx << 9) >> 16`, a comma form, a
+struct or union member local, a one-element array, a `static inline` helper by pointer,
+`do { } while (0)`, an outer-preamble dead def, an extra dead parameter, a C++ member
+function storing into a member, a ctor local, a scoped dtor local, an `int &` to a local:
+31 cells, and not one gives the shift its own register -- the size-exact ones all emit
+`lsl r0,r0,#9`, the rest break the size or the schedule). Assigning it to `cols` gives it a separate web,
+coloured `sb` (the only free register at that point), and with `x << 9` out of the way
+2004/b56 also stops coalescing `sz <- z9` and `sx <- x9` and colours those two words the
+ROM's way. The remaining half was the two loads, `vx` r5 / `vz` r0 against the ROM's
+r0 / r5, and loading z straight into `sz` (the local the result lands in) flips them.
+
+What makes `cols` special is NOT that it is loop-carried, reloaded at the tail, or compared
+in the loop condition. A fresh `k` given every one of those properties (assigned from the
+same load at the outer head, used at the inner head, reloaded at the tail, `while (j < k)`)
+stays propagated. The property that matters is the OUTER GUARD: `cols` is the value tested
+in `if (cols > 0)` before the inner loop, and its web crosses that branch into the loop.
+Reading the guard from memory instead (`if (*(u8 *)(self + 0xa7) > 0)`) or dropping the
+head use while keeping the guard tells the two apart: guard gone, effect gone (div 5,
+shipped window); head use gone, guard kept, effect kept. Renaming `cols` to `k` everywhere
+keeps it (rename-invariant). So the lever, stated generally: **a value the ROM keeps in a
+fresh register where 2004/b56 recycles the dying operand can be given its own colour by
+assigning it to a local whose live range already crosses a conditional branch out of the
+enclosing block** -- a variable the propagation pass treats as global. That is exactly the
+class 6cq named on both group-c floors (dScStarSel_c::Behavior's +0x248 `ty` web is the
+other instance) and declared out of source reach.
+
+**Measured this session (all compiled with build_pin.flags_for, scored word-for-word):**
+
+| family | cells | result |
+|---|---|---|
+| plain C++ port (`//cpp`, `extern "C"`, `-Cpp_exceptions off`) | 1 | div 4, byte-identical to C |
+| variable reuse as the shift's destination: off0, off1, p0, p1, base (char* and int forms), cols, vx, the ROM-colour chain | 15 | only `cols` moves it (div 4, win 2, +0x164 `lsl sb,r5,#9`); off1/base reuse recolours the whole function (div 54-66) |
+| around the cols cell: source order of the loads, z9 receivers, vx inline, both blocks, decl rank/type of cols/vx/vz, `register`, `int &`, the C++ port | 39 | all div 4 win 2, same window |
+| non-propagation probes for a fresh receiver (C and C++ constructs above) | 23+8 | none escapes |
+| which property of cols matters (guard / head / tail / carried / copy) | 10 | guard use is necessary; head use is not |
+| statement-order linear extensions of block B in the cols regime | 80 | 42 at the cols window, 18 at the shipped window, 20 at div 28; none better |
+| z9 receivers in the cols regime | 12 | `sz` holding the load: **div 0** |
+| cleaner spellings of the match | 11 | symmetric both-block form, C++ form, `vz = sz << 9` form all div 0; dropping `cols` (both loads held in sx/sz) div 12; z-hold without cols div 4 |
+
+Roughly 200 compiles. The whole search that mattered was `cols` (15 cells in) and `sz` (12
+cells after that); everything else here is the negative space that says why nothing
+earlier reached it.
+
+**How to apply.** On a regperm residue where the ROM refuses a dying operand's register
+(6bs/6cq shape), before banking it as a build delta: list the function's locals whose live
+range crosses a branch out of the block (loop bounds tested in a guard, values compared
+before a loop), find one that is dead across the window, and assign the new value to it.
+Then hold the OTHER chain's load in its own destination local. Score the window by offset,
+as always. The permuter cannot find this (its mutations do not reassign to existing locals
+across a guard) and neither can a rank x type sweep (the receiver has to be an existing
+global-ish web, not a fresh name).
