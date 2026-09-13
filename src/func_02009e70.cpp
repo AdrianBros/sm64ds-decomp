@@ -2,8 +2,8 @@
 // NONMATCHING: functionally-verified C, 72 of 1063 words diverge (was 96).
 // func_02009e70 @ 0x02009e70 (arm9, size 0x109c). Size exact; every opcode,
 // immediate, branch target and pool word is right. The residue is register
-// identity plus eight scheduling words: tools/wallcrack.py tags it regperm/SCHED
-// and the semantics were verified instruction by instruction (2026-08-01).
+// identity plus nine scheduling words: tools/wallcrack.py tags 63 regperm and
+// 9 SCHED, and the semantics were verified instruction by instruction (2026-08-01).
 // For recomp/port purposes the file is complete: the compiled code is
 // functionally identical to the ROM, differing only in register names and
 // instruction order.
