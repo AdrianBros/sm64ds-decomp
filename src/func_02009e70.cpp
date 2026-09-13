@@ -24,14 +24,29 @@
 // sp28 load at +0xe8c, the +0xef8/+0xf08/+0xf18 adds) falls out of it. The
 // remaining 20 are the sp10 store interleave (+0x4ac, 6w), the self+0x100
 // materialisation schedule (+0x618, 12w) and the +0xfd4 zero temp (2w).
-// The exchange does not move on any source axis measured so far: the full
+// The exchange does not move on any source axis measured. Lane CRK-M swept the
 // radius-1 declaration rank x type-name neighbourhood (166 cells, twice), 20
 // random declaration orders, the pragma vocabulary (twice), 6cd dead preamble
 // stores at four positions x eleven locals, 6cb block-depth naming, 6ce pool-
 // address launders, 21 commutative transpositions and 2100 random product draws
-// over all of those jointly. Splitting or regrouping the webs adds one live
-// range and shifts EVERY register up by one (273-297 words), so the pressure is
-// saturated at thirteen locals. Details in the lane's attempts.txt.
+// over all of those jointly. Lane CRK2-M then swept, at this 72 base and scoring
+// every cell on the WHOLE function region by region, about 1,470 further cells:
+// the COMPLETE sl x r5 declaration rank cross product (156, not just radius 1),
+// that product crossed with seven equal-width type names on each of the two
+// declarations (588, the joint 6cc axis), the 246-name pragma vocabulary at on
+// and off on top of this base (492), the birth ORDER of the three sp1c loads
+// crossed with the sb initialiser's position (24) and the three FXMULC pair
+// orders (7), the limit web's callee return type, block-depth nesting of each
+// declaration, the `register` storage class, nine disjoint-local merges that
+// relieve pressure by one, dead stores at three positions inside the f20 web,
+// the flags table's pool-address launders and index spellings, sba/t1 width
+// respellings, and comparison and mask operand transpositions at every use site
+// of both webs. R01 reads exactly 4 in every one of those cells that keeps the
+// schedule; no cell anywhere reads below 72. Splitting or regrouping the webs
+// adds one live range and shifts EVERY register up by one (273-297 words), so
+// the pressure is saturated at thirteen locals. All 25 installed compiler builds
+// were swept: 2004/b56 is the only one within reach (72); every other build
+// fails the function outright. Details in the lanes' attempts.txt.
 //
 // L0() below was a u64-mask launder (`& 0xFFFFFFFFFFFFFFFFLL` through a long long
 // round trip) that lane BANK measured dead under 2004/b56; it is kept as a no-op
