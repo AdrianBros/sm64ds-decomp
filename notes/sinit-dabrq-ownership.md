@@ -12,18 +12,18 @@ It is a proof note. It was first written on a branch named
 regenerates the initializer from a "resource TU", and the production enrolment
 of the initializer was never changed. On `main` today:
 
-- `src/__sinit_ov070_02122d80.cpp` is still the hand-transcribed, separately
+- [src/__sinit_ov070_02122d80.cpp](../src/__sinit_ov070_02122d80.cpp) is still the hand-transcribed, separately
   enrolled initializer, byte-identical to the version this audit was measured
   against;
-- `src/game/actors/daBrq_c.cpp`, described by
-  `config/tu_manifest.d/ov070/daBrq_c.json`, is the promoted class TU. Its
+- [src/game/actors/daBrq_c.cpp](../src/game/actors/daBrq_c.cpp), described by
+  [config/tu_manifest.d/ov070/daBrq_c.json](../config/tu_manifest.d/ov070/daBrq_c.json), is the promoted class TU. Its
   manifest records that the initializer, its `.ctor` word, the PMF input
   table, the resource globals, and the state-table BSS remain separately
   enrolled;
-- `src/game/actors/daBrq_c.cpp` now also holds the factory `daBrq_c_classInit`
-  (historical project alias `Amp_Spawn`). That factory is the nineteenth
-  `daBrq_c` symbol in the overlay; the manifest's eighteen functions plus this
-  factory cover every one.
+- [src/game/actors/daBrq_c.cpp](../src/game/actors/daBrq_c.cpp) now also holds the
+  factory `daBrq_c_classInit` (historical project alias `Amp_Spawn`). That factory
+  is the nineteenth `daBrq_c` symbol in the overlay; the manifest's eighteen
+  functions plus this factory cover every one.
 
 The audit answers one question only: could the original `daBrq_c` source have
 produced this initializer organically? It could, as shown below.
