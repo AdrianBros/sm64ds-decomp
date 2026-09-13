@@ -48,7 +48,7 @@ here, and they move independently.
 ```
 MATCHED    ██████████████████████████████  99.7%   11,354 / 11,390 functions
            of which 121 are byte-exact assembly (hand-written in the original, not C)
-CONVERTED  ███████░░░░░░░░░░░░░░░░░░░░░░░  23.9%   2,715 / 11,365 functions
+CONVERTED  ███████░░░░░░░░░░░░░░░░░░░░░░░  23.9%   2,716 / 11,365 functions
 LINKED     ████████████████████████████░░  93.5%   10,595 / 11,328 matched TUs
 ```
 <!-- tiers:end -->
