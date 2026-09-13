@@ -260,18 +260,112 @@ def _as_the_build_links_it(obj, name):
         return obj
 
 
-def winning_object(name, addr, size, mod, candidate=None, include_dirs=()):
+def build_flag_attempts(src_text):
+    """The (flags, suffix) pairs a candidate is compiled with, in order.
+
+    These are the ROM BUILD's flags, resolved through the one helper that already
+    reproduces `rombuild.compile_one`'s choice (`build_pin.flags_for`: the `//cpp`
+    first-line marker is the whole C-vs-C++ test, never the file extension). They are
+    NOT the match gate's `match.DEFAULT_FLAGS` / `swarm.CPP_FLAGS`, which this function
+    used to hand out.
+
+    WHY THE DIFFERENCE MATTERS. The build compiles with `-Cpp_exceptions off`; the match
+    gate's flags leave exceptions ON. That single flag moved verdicts in both directions,
+    measured 2026-09-13 over every open PR head:
+
+      * FALSE RED. Three sibling `classInit` bodies (ov043 0x0211176c, ov047 0x0211164c,
+        ov036 0x021120c8) reproduce the ROM exactly under the build's flags and miss it
+        by the same five words under exceptions-on -- mwccarm schedules the second
+        `__cxa_vec_ctor`'s stacked argument differently (ROM: `ip` with the `str` sunk
+        below the argument setup; exceptions-on: `r2` with the `str` hoisted above it).
+        Each read NO-REPRO on a file the ROM build accepts.
+
+      * FALSE GREEN, which is the worse half. Exceptions-on makes mwccarm emit
+        `.exceptix`/`.rela.exceptix` alongside the function. `objisolate.isolate` returns
+        early when a plan has nothing to drop, so those two extra sections are the only
+        reason isolation runs at all on a single-function object -- and running it also
+        applies the vtable-preamble correction, rewriting a `_ZTV<C>` reference's addend
+        8 down to 0. Compiled the way the build compiles it there is nothing to drop,
+        isolation is a no-op, and the +8 survives into the link. A source spelling a
+        vptr store as `&_ZTV<C>[2]` therefore link-checked VERIFIED while the ROM build
+        stored the address eight bytes high (ov100 0x02147328: 0x02148584 for a slot
+        array that lives at 0x0214857c) and reported the overlay MISMATCHING.
+
+    A gate that predicts the link has to compile the way the link compiles; anything else
+    is measuring a build nobody ships.
+
+    THE MANIFEST WAS THE OTHER CANDIDATE, and this is why it is not the one. Every
+    promoted TU already records the build's flag string under `verification.flags` in
+    `config/tu_manifest.d/**`, so the audit could have read them from there. Measured,
+    the two rules never disagree -- all 177 entries' recorded strings are exactly the two
+    strings below, which is what tools/test_reloc_audit_flags.py re-checks entry for
+    entry -- but they do not reach the same files. The manifest's 177 entries name 208
+    source paths, 146 of which still exist; src/ holds 8,930. The file that produced the
+    false green above is not one of the 146. Reading the build covers all 8,930, so it is
+    a superset of the manifest rule on the rows where the manifest has an opinion.
+    """
+    import build_pin as BP
+    cxx = BP.flags_for("candidate.cpp", "//cpp")
+    if src_text.startswith("//cpp"):
+        return [(cxx, ".cpp")]
+    # Committed sources do not always carry the marker, so a non-marked file is still
+    # tried both ways -- the same two-attempt shape this has always had, now with the
+    # build's flag set on both attempts.
+    return [(BP.flags_for("candidate.c", ""), ".c"), (cxx, ".cpp")]
+
+
+def resolve_nested_slice(sym, code, relocs, addr, size, name_index):
+    """If `name`'s ROM range [addr, addr+size) is not `sym`'s own compiled length but
+    lies fully WITHIN it -- a hand-asm block packing several ROM functions into one
+    compiled symbol (see func_01ff97d8.c: 0xb6c bytes, five more ROM addresses
+    inside) -- resolve `sym`'s own ROM address the same way every reloc destination
+    is resolved (func_<addr> name, else symbols.txt via name_index) and slice by
+    address arithmetic against that -- never by scanning the source text for a
+    label, which this source does not reliably carry (func_01ff97d8.c's own labels
+    are offsets from ITS base, spelled `_L<hex>`, not the nested functions' names or
+    addresses).
+
+    Returns (sliced_code, sliced_relocs, offset), or None if `sym` does not contain
+    the range -- including when `size` is 0 (a zero-size alias record; that shape is
+    resolved by bytegate.alias_target_size against the TARGET side, not by searching
+    for a container here).
+
+    Shared by winning_object (compiling every source candidate fresh, per version)
+    and nearmiss_db.evaluate_full (scoring one already-compiled near-miss draft), so
+    the two can never resolve a nested name differently from each other."""
+    res = resolve_candidate(sym, name_index or {})
+    sym_addr = res[1] if res else None
+    if (sym_addr is None or not size
+            or not (sym_addr <= addr and addr + size <= sym_addr + len(code))):
+        return None
+    off = addr - sym_addr
+    return code[off:off + size], {r - off for r in relocs if off <= r < off + size}, off
+
+
+def winning_object(name, addr, size, mod, candidate=None, include_dirs=(), name_index=None):
     """Reproduce the match the way reverify does, but return the object that did it.
 
     Mirrors reverify_corpus.compiles_to so the audit measures exactly what reverify
     blesses -- same sources, same version sweep, same any-symbol acceptance.
     When ``candidate`` is supplied, verify that source file directly instead of
-    looking it up under ``src/``. This is the safe bridge for workbench artifacts."""
+    looking it up under ``src/``. This is the safe bridge for workbench artifacts.
+
+    Returns a 4-tuple ``(obj, sym, err, offset)``. ``offset`` is 0 for every ordinary
+    match (`sym`'s own compiled bytes are what `name` names) and nonzero only for a
+    NESTED entry point: a hand-asm block that packs several ROM functions into ONE
+    compiled symbol, e.g. func_01ff97d8.c, whose object defines only "func_01ff97d8"
+    (0xb6c bytes) though config/**/symbols.txt records five more ROM addresses inside
+    that span. There, `sym` is the CONTAINING symbol and `offset` is where `name`'s own
+    bytes start within it; a caller that re-extracts by symbol alone (tools/linkcheck.py
+    does, to run the reloc-linking check this function does not do) has to slice at
+    `offset` first or it re-derives the whole container's bytes instead of `name`'s own.
+    `name_index` (symbol name -> (module, addr)) is required to resolve that containing
+    symbol's own ROM address for the slice; omit it and only func_<addr>-shaped
+    containers (which carry their address in the name itself) get nested-slice support."""
     import reverify_corpus as RV
-    import swarm as S
     target = RV.rom_bytes(mod, addr, size)
     if target is None:
-        return None, None, "no-module-bin"
+        return None, None, "no-module-bin", 0
     # Distinguish the three ways this can fail so callers do not report a missing
     # or wrong-length source as "no-repro" (which reads as a false-match red flag).
     # saw_source: src_texts yielded at least one candidate to try.
@@ -292,8 +386,7 @@ def winning_object(name, addr, size, mod, candidate=None, include_dirs=()):
         sources = [(src, None) for src in RV.src_texts(name, addr)]
     for src, source_path in sources:
         saw_source = True
-        attempts = ([(S.CPP_FLAGS, ".cpp")] if src.startswith("//cpp")
-                    else [(M.DEFAULT_FLAGS, ".c"), (S.CPP_FLAGS, ".cpp")])
+        attempts = build_flag_attempts(src)
         for flags, suf in attempts:
             tmp = None
             if source_path is None:
@@ -331,7 +424,7 @@ def winning_object(name, addr, size, mod, candidate=None, include_dirs=()):
                         code, relocs = M.extract_func(obj, sym)
                         if code is None:
                             continue
-                        tgt = target
+                        tgt, off = target, 0
                         if len(code) != len(tgt):
                             # Split-symbol carrier (notes 9a(3)): a function whose compiled
                             # form extends over the following severed fragment(s), e.g.
@@ -340,24 +433,32 @@ def winning_object(name, addr, size, mod, candidate=None, include_dirs=()):
                             # overhang included -- strictly stronger than the plain check, so
                             # a wrong-sized near miss cannot slip through. 0x40 bounds the
                             # overhang to fragment scale.
-                            if not (len(code) > len(tgt) and len(code) - len(tgt) <= 0x40):
-                                continue
-                            ext = RV.rom_bytes(mod, addr, len(code))
-                            if ext is None or len(ext) != len(code):
-                                continue
-                            tgt = ext
+                            if len(code) > len(tgt) and len(code) - len(tgt) <= 0x40:
+                                ext = RV.rom_bytes(mod, addr, len(code))
+                                if ext is None or len(ext) != len(code):
+                                    continue
+                                tgt = ext
+                            else:
+                                # NESTED ENTRY POINT: `sym` may CONTAIN `name`'s ROM range
+                                # rather than equal or merely overhang it -- see
+                                # resolve_nested_slice for the address-anchored resolution.
+                                sliced = resolve_nested_slice(sym, code, relocs, addr, size,
+                                                              name_index)
+                                if sliced is None:
+                                    continue
+                                code, relocs, off = sliced
                         saw_len = True
                         ok, _ = M.compare(tgt, code, relocs, verbose=False)
                         if ok:
-                            return obj, sym, None
+                            return obj, sym, None, off
             finally:
                 if tmp is not None:
                     pathlib.Path(tmp).unlink(missing_ok=True)
     if not saw_source:
-        return None, None, "no-source"      # no src/<name>.c|.cpp on disk to try
+        return None, None, "no-source", 0      # no src/<name>.c|.cpp on disk to try
     if not saw_len:
-        return None, None, "len-mismatch"   # compiled, but never the target's length
-    return None, None, "no-repro"           # right length, but bytes never matched
+        return None, None, "len-mismatch", 0   # compiled, but never the target's length
+    return None, None, "no-repro", 0           # right length, but bytes never matched
 
 
 def classify(cand_name, cand_mod, cand_addr, cfg, sym_index):
@@ -486,7 +587,7 @@ def audit_entry(entry, name_index, config_relocs, sym_index):
     addr = int(entry["addr"], 16) if isinstance(entry["addr"], str) else entry["addr"]
     size = entry["size"]
     mod = entry["module"]
-    obj, sym, err = winning_object(name, addr, size, mod)
+    obj, sym, err, _off = winning_object(name, addr, size, mod, name_index=name_index)
     if obj is None:
         return {"name": name, "module": mod, "addr": f"0x{addr:08x}",
                 "verdict": "NO-REPRO", "reason": err, "relocs": []}

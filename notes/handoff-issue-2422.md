@@ -8,12 +8,12 @@ This document describes this commit. The queue records its immutable output SHA.
   https://github.com/tangosdev/sm64ds-decomp/issues/2422, `issue-2422`, stage
   `reconstruct` (producer), session `prod-2422-0907`, Claude Code.
 - Source branch and previous accepted input SHA: `cpp/daBrq_c-bank`; accepted
-  input `9fded5f5242a10f04f318da3bfd477993a192d20` (tip of the local-only
+  input `17c1aaafa8b77359beb458c13a488b77a7e0277a` (tip of the local-only
   `cpp/dabrq-sinit-resource-tu`).
 - Original source base SHA and installed workflow/tool SHA: original base
-  `6f0a3ab9bd6d01373744d32cedb7e0f3dc6cffb8`; this commit is built on `main` at
-  `88dbe66db2cb3f0cd1dc704e9f2775eb37aea646`; workflow/tool pin
-  `f327f7b6460e157153eb7fc0749dbbe60dd854f1`.
+  `0300c778fd0bcc548397fdc6a58e543d467f596f`; this commit is built on `main` at
+  `c4cace0ee05f2c0b3c6536665e981927ead132e2`; workflow/tool pin
+  `d7e28406933497ff40150f9b912efe64666a00b2`.
 - Separate evidence commits and required artifacts in this commit: none
   separate. This commit adds `notes/sinit-dabrq-ownership.md`,
   `notes/sinit-probes/dabrq.cpp`, and this handoff. The private queue receipt
@@ -26,34 +26,34 @@ This document describes this commit. The queue records its immutable output SHA.
 - Status: verified candidate for the narrowed scope (a proof note whose claim
   was re-measured under the pinned compiler on this base). Nothing is WIP.
 - Remaining uncommitted/local-only material and where it is preserved: the
-  original branch `cpp/dabrq-sinit-resource-tu` at `9fded5f52` and its
+  original branch `cpp/dabrq-sinit-resource-tu` at `17c1aaafa` and its
   worktree remain in place, untouched. Its other two commits are superseded
   (see below), not lost.
 
 ## What changed and why
 
-- Class/TU/symbol and module-qualified ROM scope: `ov070/daBrq_c`; the
-  initializer `__sinit_ov070_02122d80` at `ov070:0x02122d80..0x02122f30`, its
-  `.data` PMF descriptors `ov070:0x0212320c..0x0212323c`, and its `.bss`
-  objects `ov070:0x021235ec..0x02123698`. Nothing in those ranges is
+- Class/TU/symbol and module-qualified ROM scope: [ov070](../config/arm9/overlays/ov070/symbols.txt)/[daBrq_c](../src/game/actors/daBrq_c.cpp); the
+  initializer [__sinit_ov070_02122d80](../src/__sinit_ov070_02122d80.cpp) at [ov70](../config/arm9/overlays/ov070/symbols.txt):`0x02122d80..0x02122f30`, its
+  `.data` PMF descriptors [ov70](../config/arm9/overlays/ov070/symbols.txt):`0x0212320c..0x0212323c`, and its `.bss`
+  objects [ov70](../config/arm9/overlays/ov070/symbols.txt):`0x021235ec..0x02123698`. Nothing in those ranges is
   re-enrolled or re-owned by this commit.
 - Reserved source/header/config surfaces actually touched: none. Only
   `notes/` changed. The reserved TU, header, manifest, `delinks.txt`,
   `symbols.txt`, and `symbols/actor_renames.tsv` are untouched; zero rename
   rows appended.
-- ROM observations: symbol spacing in `config/arm9/overlays/ov070/symbols.txt`
+- ROM observations: symbol spacing in [overlays/ov070/symbols.txt](../config/arm9/overlays/ov070/symbols.txt)
   shows five 8-byte handles, six 12-byte registration nodes, one 12-byte
   vector, one 48-byte state array ending exactly at the next symbol, and six
   8-byte PMF descriptors ending exactly at `_ZTS7daBrq_c`. No absorbed array,
   no phantom index.
 - Lineage evidence or structural inference: the original task assumed the
   branch's promotion was unbanked. It is banked: the branch's promotion commit
-  `883c4cf4a` is the same change as `7402d8be8`, already on `main` via
+  `00a5071a0` is the same change as `c26edf2a4`, already on `main` via
   https://github.com/tangosdev/sm64ds-decomp/pull/2084, and the later profile
-  campaign moved the TU to `src/game/actors/daBrq_c.cpp` and renamed
-  `Amp_Spawn` to `daBrq_c_classInit` (`src/d_a_brq.c`) and `Amp_SpawnInfo` to
+  campaign moved the TU to [src/game/actors/daBrq_c.cpp](../src/game/actors/daBrq_c.cpp) and renamed
+  `Amp_Spawn` to `daBrq_c_classInit` ([src/d_a_brq.c](../src/d_a_brq.c)) and `Amp_SpawnInfo` to
   `g_profile_BIRIKYU`. Every differing line between the branch TU and `main`'s
-  is that rename or comment prose. The branch's tools commit `e4650db21` was
+  is that rename or comment prose. The branch's tools commit `6eb1cb808` was
   superseded by https://github.com/tangosdev/sm64ds-decomp/pull/2074. The only
   content unique to the branch was the note and probe banked here.
 - Hypothesized names/filenames, explicitly not recovered facts: the probe's
@@ -61,7 +61,7 @@ This document describes this commit. The queue records its immutable output SHA.
   and forbids promoting them.
 - Compiler experiments and measured barriers: the guarded probe compiled with
   `swarm.CPP_FLAGS` plus `-DSINIT_OWNERSHIP_PROBE` reproduces
-  `__sinit_ov070_02122d80` byte-for-byte (`0x1b0/0x1b0`) with 34/34
+  [__sinit_ov070_02122d80](../src/__sinit_ov070_02122d80.cpp) byte-for-byte (`0x1b0/0x1b0`) with 34/34
   relocation offsets, types, and addends equal; only the 34 symbol spellings
   differ. Without the define the probe emits no production sections.
 
@@ -71,7 +71,7 @@ This document describes this commit. The queue records its immutable output SHA.
   the record, `main`'s manifest lists 18 functions and `symbols.txt` lists 18
   `_ZN7daBrq_c*` symbols (set difference empty both ways); the 19th class
   symbol is the factory `daBrq_c_classInit` at `0x021210ac`, deliberately
-  enrolled outside the TU in `src/d_a_brq.c` because mwccarm cannot express
+  enrolled outside the TU in [src/d_a_brq.c](../src/d_a_brq.c) because mwccarm cannot express
   placement construction against the retail `fBase_c` allocator. Neither side
   dropped a function.
 - Genuine methods; remaining free-function/ABI bridges: unchanged; the factory
@@ -81,7 +81,7 @@ This document describes this commit. The queue records its immutable output SHA.
   destructor stays inline in `include/daBrq_c.h` with `InitResources` as the
   key function; the manifest's `data` list still owns `_ZTS`, `_ZTI`,
   `g_profile_BIRIKYU`, and `_ZTV`. The initializer stays separately enrolled
-  in `src/__sinit_ov070_02122d80.cpp`, identical between the branch and `main`.
+  in [__sinit_ov070_02122d80.cpp](../src/__sinit_ov070_02122d80.cpp), identical between the branch and `main`.
 - Attribution preserved through each move/rename: no move or rename here.
 - Remaining agreed issue scope: none after this commit; the promotion is
   already on `main`. The engine-level reconstruction of the resource wrapper
@@ -91,7 +91,7 @@ This document describes this commit. The queue records its immutable output SHA.
 ## Proof
 
 All commands were run in the worktree on this commit's tree at base
-`88dbe66db`, pinned mwccarm 2004/b56 toolchain (wired and canary-verified by
+`c4cace0ee`, pinned mwccarm 2004/b56 toolchain (wired and canary-verified by
 the worktree helper).
 
 - Full-ROM build: not run; not applicable. No enrolled source, header,
@@ -101,7 +101,8 @@ the worktree helper).
   exit 0: `bytes: 0x1b0/0x1b0 equal=True`, `relocations: 34/34`, all offsets,
   types, and addends equal, 34 name-only differences, probe without the define
   emits no `.text`/`.init`/`.data`/`.bss`/`.ctor`/`.rodata` content. Compared
-  `__sinit_dabrq.cpp` from the probe object against `__sinit_ov070_02122d80`
+  `__sinit_dabrq.cpp` from the probe object against [__sinit_ov070_02122d80.cpp](../src/__sinit_ov070_02122d80.cpp) from the committed transcription with the same flags.
+- Explicit function/consumer relocation checks: the probe reproduction above,
   compiled from the committed transcription with the same flags.
 - Complete emitted TU and data/metadata checks: not run; no TU changed.
 - Shared-header consumer expansion: not applicable; no header changed.

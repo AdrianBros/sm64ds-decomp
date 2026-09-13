@@ -83,12 +83,15 @@ struct Crate : dBgActor_c {
 
     /* --- vtable, own overrides --- */
     virtual int  OnYoshiTryEat();                      /* slot 18 */
-    virtual int  OnTurnIntoEgg(Player &player);         /* slot 19 */
+    virtual void OnTurnIntoEgg(Player &player);         /* slot 19 */
     virtual void OnGroundPounded(dActor_c &other);      /* slot 21 */
     virtual void Kill();                                /* slot 31 */
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char Crate_size_must_be_0x608[sizeof(Crate) == 0x608 ? 1 : -1];
+#endif
 
 #else
 

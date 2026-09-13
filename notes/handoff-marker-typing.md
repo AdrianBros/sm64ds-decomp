@@ -8,7 +8,7 @@ to take on trust. Where a number appears, the command that produces it appears w
 ## 1. What this is
 
 241 headers in `include/` carry `AUTO-GENERATED from matched-function evidence by
-tools/gen_header.py`. **No such generator was ever committed** -- `5ddf7d2d` (PR #866)
+tools/gen_header.py`. **No such generator was ever committed** -- `be9d58ed` (PR #866)
 added all 368 headers and zero `tools/` files. Nothing had ever checked what they claim.
 
 Where the original generator did not know a field's type it wrote a bare `u8` and padded
@@ -105,7 +105,7 @@ Do that, per class, byte-verifying each. Then re-run the census and the clean sw
 
 The 29: `BobOmb BooCage Bowser BowserFire BowserPuzzlePiece Bullet Coffin FlyGuy Goomba
 Koopa Lakitu LakituBro MadPiano MrI MrI_Projectile OneUpMushroom PrincessPeach
-RotatingClockHand Scuttlebug SignPost SnowmanBody SnowmanHead Snufit Spindrift Stage
+RotatingClockHand Scuttlebug SignPost daBgSnmBdy_c SnowmanHead Snufit Spindrift Stage
 Swoop TtcConveyorBeltLarge WaterBomb YoshiEgg`
 
 ## 6. Gates -- run all of them, and know what each cannot see

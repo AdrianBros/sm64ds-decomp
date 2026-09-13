@@ -61,7 +61,7 @@ struct Lakitu : dActor_c {
     virtual ~Lakitu();            /* slots 16 (D1), 17 (D0) */
 
     virtual int   OnYoshiTryEat();               /* slot 18 */
-    virtual int   OnTurnIntoEgg(Player &player); /* slot 19 */
+    virtual void  OnTurnIntoEgg(Player &player); /* slot 19 */
     virtual int   OnAimedAtWithEgg();            /* slot 29 */
 
     int Behavior();
@@ -71,6 +71,9 @@ struct Lakitu : dActor_c {
     void OnPendingDestroy();
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char Lakitu_size_must_be_0x420[sizeof(Lakitu) == 0x420 ? 1 : -1];
+#endif
 
 #endif /* LAKITU_H */

@@ -46,7 +46,7 @@
 #define DSCMGFLOWER_C_H
 #include "dScMgSingle3DBase_c.h"
 
-extern "C" void func_ov006_020c3e70(char *t); /* decl_common.h's own signature */
+extern "C" void *func_ov006_020c3e70(char *t); /* decl_common.h's own signature */
 extern "C" void __cxa_vec_cleanup(void *base, int count, int stride, void *dtor);
 extern "C" void func_ov006_0212a650(void);
 
@@ -128,6 +128,9 @@ struct dScMgFlower_c : dScMgSingle3DBase_c {
     u8  pad_5ff6[0x2];     /* 0x5ff6 -- rounds up to the 0x5ff8 boundary */
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char dScMgFlower_c_size_must_be_0x5ff8[sizeof(dScMgFlower_c) == 0x5ff8 ? 1 : -1];
+#endif
 
 #endif

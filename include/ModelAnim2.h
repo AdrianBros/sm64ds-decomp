@@ -28,7 +28,19 @@ struct ModelAnim2 : ModelAnim {
     Animation otherAnim;       /* 0x68 - a member, built with Animation::C1 */
 
     /* --- vtable order. Do not reorder. --- */
+    /* The destructor pair spelled as two plain virtuals on the host, plus the
+       non-virtual destructor declaration the src/ definitions need; the whole
+       ruling is in include/ModelBase.h. Nothing is declared after it here, so
+       this class has no skew of its own -- but an override must still carry
+       the SAME TWO NAMES its base declares, or slots 0 and 1 of the primary
+       table would be a fresh pair appended past Virtual18 instead. */
+#ifdef _MSC_VER
+    virtual void Destructor1();                /* slot 0 (D1) */
+    virtual void Destructor0();                /* slot 1 (D0) */
+    ~ModelAnim2();                             /* no slot */
+#else
     virtual ~ModelAnim2();                     /* slots 0 (D1), 1 (D0) */
+#endif
 
     /* DECLARED, defined out of line in src/_ZN10ModelAnim2C1Ev.cpp as real
      * C++ -- complete-object context, hence C1. Init list `: otherFile(0)`
@@ -54,7 +66,10 @@ struct ModelAnim2 : ModelAnim {
 
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char ModelAnim2_size_must_be_0x78[sizeof(ModelAnim2) == 0x78 ? 1 : -1];
+#endif
 
 #endif /* __cplusplus */
 

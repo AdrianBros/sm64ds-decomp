@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 TOOLS = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS))
@@ -251,6 +252,184 @@ class NearMissDbTests(unittest.TestCase):
         finally:
             NDB.CONFIG_GLOB_ROOT = NDB.REPO
 
+    # -------------------------------------------------------------- fix-refs
+    # check-refs only REPORTS a dead reference; fix-refs is the tool-native repair --
+    # a whole-word rewrite of the stale name to its current, address-resolved one,
+    # touching only c_source. Mirrors the real pre-existing row: arm9 __rethrow's
+    # c_source still spells its own function `func_020717c0` after config renamed the
+    # symbol at that address.
+    def _fixture_config_addr(self, name, addr):
+        root = pathlib.Path(tempfile.mkdtemp())
+        d = root / "config"
+        d.mkdir(parents=True)
+        (d / "symbols.txt").write_text(
+            "%s kind:function(arm,size=0x10) addr:0x%08x\n" % (name, addr),
+            encoding="utf-8")
+        return root
+
+    def test_fix_refs_rewrites_a_reference_resolvable_by_address(self):
+        self.write_rows(row(1, name="__rethrow",
+                             c_source="void func_020717c0(void) { __rethrow(); }"))
+        NDB.CONFIG_GLOB_ROOT = self._fixture_config_addr("__rethrow", 0x020717C0)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.fix_refs(argparse.Namespace(dry_run=False))
+            self.assertIn("rewrote 1 dead reference(s) across 1 row(s)", out.getvalue())
+            db, _ = self.load_quiet()
+            self.assertNotIn("func_020717c0", db[KEY]["c_source"])
+            self.assertEqual(db[KEY]["c_source"], "void __rethrow(void) { __rethrow(); }")
+            # check-refs is clean afterward -- the fix actually closes the finding.
+            with contextlib.redirect_stdout(io.StringIO()) as out2:
+                NDB.check_refs(argparse.Namespace(check=True))
+            self.assertIn("every reference", out2.getvalue())
+        finally:
+            NDB.CONFIG_GLOB_ROOT = NDB.REPO
+
+    def test_fix_refs_dry_run_changes_nothing(self):
+        self.write_rows(row(1, name="__rethrow",
+                             c_source="void func_020717c0(void) { __rethrow(); }"))
+        NDB.CONFIG_GLOB_ROOT = self._fixture_config_addr("__rethrow", 0x020717C0)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.fix_refs(argparse.Namespace(dry_run=True))
+            self.assertIn("func_020717c0 -> __rethrow", out.getvalue())
+            self.assertIn("(dry run)", out.getvalue())
+            db, _ = self.load_quiet()
+            self.assertIn("func_020717c0", db[KEY]["c_source"])
+        finally:
+            NDB.CONFIG_GLOB_ROOT = NDB.REPO
+
+    def test_fix_refs_leaves_an_unresolved_reference_alone(self):
+        # No address in config for func_020124c4 -- nothing fix-refs can do with it;
+        # it must not touch c_source or crash.
+        self.write_rows(row(10, c_source="void f(void){ func_020124c4(); }"))
+        NDB.CONFIG_GLOB_ROOT = self._fixture_config("Sound_PlayIfNotActive")
+        try:
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.fix_refs(argparse.Namespace(dry_run=False))
+            self.assertIn("rewrote 0 dead reference(s)", out.getvalue())
+            db, _ = self.load_quiet()
+            self.assertIn("func_020124c4", db[KEY]["c_source"])
+        finally:
+            NDB.CONFIG_GLOB_ROOT = NDB.REPO
+
+    def test_fix_refs_is_a_no_op_when_every_reference_resolves(self):
+        self.write_rows(row(10, c_source="void f(void){ Sound_PlayIfNotActive(); }"))
+        NDB.CONFIG_GLOB_ROOT = self._fixture_config("Sound_PlayIfNotActive")
+        try:
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.fix_refs(argparse.Namespace(dry_run=False))
+            self.assertIn("rewrote 0 dead reference(s)", out.getvalue())
+        finally:
+            NDB.CONFIG_GLOB_ROOT = NDB.REPO
+
+    # ---------------------------------------------------------- set-divergence
+    # nearmiss/db.jsonl's own metric can UNDERCOUNT a stored row (2026-09-09: a pure
+    # 3-instruction ROM reorder on _ZN3MrI13InitResourcesEv scored 2 under
+    # evaluate_full's SequenceMatcher diff but 3 under tools/match.py's positional
+    # MISMATCH count, the number the committed src/ header and floors.jsonl agreed on),
+    # and merge_batch/ingest is deliberately strictly-improving, so nothing else in
+    # this file can ever RAISE a stored divergence. set_divergence is the escape hatch;
+    # these tests hold it to both directions and to surviving reeval/bank-matches.
+    def test_set_divergence_can_raise_a_stale_row(self):
+        self.write_rows(row(2))
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            NDB.set_divergence(argparse.Namespace(
+                name="func_ov004", divergences=3,
+                evidence="match.py --strict-relocs 2004/b56: 3 MISMATCH at +0x20/+0x24/+0x28"))
+        db, _ = self.load_quiet()
+        self.assertEqual(db[KEY]["divergences"], 3)
+        self.assertTrue(db[KEY]["manual_divergences"])
+        self.assertIn("MISMATCH", db[KEY]["manual_evidence"])
+        self.assertIn("2 -> 3", out.getvalue())
+
+    def test_set_divergence_can_also_lower_a_row(self):
+        # Not one-directional: the same verb corrects an over-count too.
+        self.write_rows(row(50))
+        NDB.set_divergence(argparse.Namespace(
+            name="func_ov004", divergences=10, evidence="match.py: 10 MISMATCH"))
+        db, _ = self.load_quiet()
+        self.assertEqual(db[KEY]["divergences"], 10)
+
+    def test_set_divergence_unknown_name_exits_without_writing(self):
+        self.write_rows(row(2))
+        with contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                NDB.set_divergence(argparse.Namespace(
+                    name="nope", divergences=3, evidence="x"))
+        db, _ = self.load_quiet()
+        self.assertEqual(db[KEY]["divergences"], 2)      # untouched
+
+    def test_set_divergence_drops_cand_size_not_backed_by_a_fresh_compile(self):
+        self.write_rows(row(2, cand_size=0x164))
+        NDB.set_divergence(argparse.Namespace(
+            name="func_ov004", divergences=3, evidence="x"))
+        db, _ = self.load_quiet()
+        self.assertNotIn("cand_size", db[KEY])
+
+    def test_is_manual_false_by_default(self):
+        self.assertFalse(NDB._is_manual(row(10)))
+
+    def test_is_manual_true_after_a_correction(self):
+        self.write_rows(row(2))
+        NDB.set_divergence(argparse.Namespace(
+            name="func_ov004", divergences=3, evidence="x"))
+        db, _ = self.load_quiet()
+        self.assertTrue(NDB._is_manual(db[KEY]))
+
+    def test_reeval_order_excludes_manual_rows(self):
+        # reeval must never hand a manual row to evaluate_full -- that recompile is
+        # exactly what would silently undo the correction (see _is_manual). This checks
+        # the filter reeval builds `order` from, without invoking reeval itself (which
+        # unconditionally imports the compiler-backed match module).
+        manual = row(3, addr="0x020ae858", manual_divergences=True, evidence="x")
+        other = row(42, addr="0x020ee994", module="ov006")
+        self.write_rows(manual, other)
+        db, _ = self.load_quiet()
+        order = [r for r in db.values() if not NDB._is_manual(r)]
+        self.assertEqual([r["divergences"] for r in order], [42])
+
+    # ---------------------------------------------- manual hold auto-release (reeval)
+    # METRIC_REV 2 makes evaluate_full agree with match.py, so a manual correction's
+    # OWN stored c_source should now reproduce the hand-set number under the live
+    # evaluator on its own -- reeval verifies that every pass and retires the hold
+    # instead of leaving a row manual forever (_manual_hold_releasable is the pure
+    # decision function reeval's compiler-backed loop calls; these test it directly).
+    def test_manual_hold_releasable_when_live_score_agrees(self):
+        r = row(3, manual_divergences=True, manual_evidence="x", manual_date="2026-09-09")
+        full = {"status": None, "error": None, "divergences": 3, "cand_size": 20, "ok": False}
+        self.assertTrue(NDB._manual_hold_releasable(r, full))
+
+    def test_manual_hold_not_releasable_when_live_score_disagrees(self):
+        r = row(3, manual_divergences=True)
+        full = {"status": None, "error": None, "divergences": 2, "cand_size": 20, "ok": False}
+        self.assertFalse(NDB._manual_hold_releasable(r, full))
+
+    def test_manual_hold_not_releasable_when_unscorable(self):
+        r = row(3, manual_divergences=True)
+        full = {"status": "noncompile", "error": "x", "divergences": None, "cand_size": None,
+                "ok": False}
+        self.assertFalse(NDB._manual_hold_releasable(r, full))
+
+    # ------------------------------------------------- apply_eval: not strictly-improving
+    # ingest/merge_batch is deliberately strictly-improving (never regresses a stored
+    # divergence between two competing drafts); apply_eval is the OTHER half of the
+    # rule -- re-measuring the SAME draft under today's live scorer moves the number
+    # whichever way the scorer says, including up, when a compiler/metric bump makes
+    # yesterday's count wrong (see merge_batch's and apply_eval's docstrings).
+    def test_apply_eval_can_raise_a_rows_divergences(self):
+        r = row(2, cand_size=0x150)
+        NDB.apply_eval(r, {"status": None, "error": None, "divergences": 5,
+                            "cand_size": 0x164})
+        self.assertEqual(r["divergences"], 5)
+        self.assertEqual(r["cand_size"], 0x164)
+
+    def test_apply_eval_can_lower_a_rows_divergences(self):
+        r = row(50)
+        NDB.apply_eval(r, {"status": None, "error": None, "divergences": 3,
+                            "cand_size": 0x164})
+        self.assertEqual(r["divergences"], 3)
+
     # ------------------------------------------------------------------ imports
     def test_module_imports_without_the_compile_stack(self):
         # stats/list/dedupe and this suite must run where capstone/pyelftools are
@@ -262,6 +441,380 @@ class NearMissDbTests(unittest.TestCase):
                              capture_output=True, text=True)
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertEqual(out.stdout.strip(), "clean")
+
+    # --------------------------------------------- match.py scorer parity (METRIC_REV 2)
+    # The bug this change fixes: a pure instruction-position ROTATE reads differently
+    # under an edit-distance diff (which finds a cheaper alignment across the reorder)
+    # than under match.py's own fixed-position word compare -- 2 vs 3 on a real
+    # 3-instruction ROM rotation (_ZN3MrI13InitResourcesEv, 2026-09-09). These need
+    # capstone/pyelftools to import tools/match.py (compare(verbose=False) never
+    # disassembles, so no capstone CALL happens, only the import) but never mwccarm --
+    # skip cleanly wherever those two packages are not installed, run for real
+    # wherever tool-tests.yml's `pip install -r tools/requirements.txt` step ran.
+    def _require_compile_stack(self):
+        try:
+            import match
+            import swarm
+        except ImportError as e:
+            self.skipTest(f"capstone/pyelftools not installed: {e}")
+        return match, swarm
+
+    def test_match_compare_counts_a_pure_reorder_positionally(self):
+        M, _ = self._require_compile_stack()
+        a, b, c = b"\x01\x00\x00\x00", b"\x02\x00\x00\x00", b"\x03\x00\x00\x00"
+        target = a + b + c                  # the ROM's order
+        candidate = b + c + a               # a full rotation of the same three words
+        ok, ndiff = M.compare(target, candidate, set(), verbose=False)
+        self.assertFalse(ok)
+        self.assertEqual(ndiff, 3)           # match.py --brief's own number for this shape
+
+    def test_evaluate_full_divergences_is_match_compares_own_number(self):
+        # Wire-level parity, not just equal-by-coincidence: stub only the compile/
+        # extract steps (oracle_check, extract_func) so evaluate_full's divergence
+        # count runs through the REAL match.compare on these bytes, not a
+        # reimplementation. No mwccarm involved.
+        M, swarm = self._require_compile_stack()
+        from unittest import mock
+        a, b, c = b"\x01\x00\x00\x00", b"\x02\x00\x00\x00", b"\x03\x00\x00\x00"
+        target = a + b + c
+        candidate = b + c + a
+        with mock.patch.object(swarm, "oracle_check", return_value=(False, b"fake-obj")), \
+             mock.patch.object(M, "extract_func", return_value=(candidate, set())):
+            full = NDB.evaluate_full("void f(void){}", "f", target)
+        direct_ok, direct_ndiff = M.compare(target, candidate, set(), verbose=False)
+        self.assertEqual(full["divergences"], direct_ndiff)
+        self.assertEqual(full["divergences"], 3)
+        self.assertEqual(full["ok"], direct_ok)
+
+
+class EvaluateFullResolverParityTests(unittest.TestCase):
+    """evaluate_full resolves the candidate for the same two shapes LINKCHK2 (#2535)
+    closed in tools/linkcheck.py's byte gate -- the nine ITCM rows NMDB2's whole-DB
+    reeval marked func-absent (extract by exact name found nothing, because that is
+    what a zero-size alias record and a nested entry point both look like to a plain
+    symbol lookup). Shared, not re-derived: bytegate.alias_target_size and
+    reloc_audit.resolve_nested_slice are the exact functions tools/linkcheck.py
+    calls, imported here and there, so a stored divergence can never disagree with a
+    fresh linkcheck run on the same c_source.
+
+    The Unit tests below mock oracle_check/extract_func/alias_target_size/
+    resolve_nested_slice directly and need no compiler at all -- same convention
+    test_linkcheck.py's own AliasSizeSubstitutionUnit / NestedOffsetRebaseUnit use,
+    for the same reason: the WIRING is what these prove, and resolve_nested_slice's
+    own offset arithmetic already has dedicated coverage there (shared code, not
+    re-tested here). RealCompileFixtures below compiles the actual committed
+    src/_dmul.c and src/func_01ff97d8.c and skips if the canonical (2004/b56)
+    compiler is absent, same as tools/test_linkcheck.py's RealCompileFixtures."""
+
+    def _require_compile_stack(self):
+        try:
+            import match
+            import swarm
+        except ImportError as e:
+            self.skipTest(f"capstone/pyelftools not installed: {e}")
+        return match, swarm
+
+    def test_alias_zero_size_row_is_scored_against_its_sized_twin(self):
+        """A zero-size EABI alias row (e.g. _dadd, config size 0 at the same address
+        as the sized primary func_01ff8000): the caller's own target/size are 0
+        bytes -- exactly the shape that used to read func-absent regardless of how
+        correct the source was, because a 0-byte target can never be byte-compared
+        against a nonzero compiled candidate. evaluate_full must resolve the real
+        size the same way linkcheck() does (bytegate.alias_target_size) and re-read
+        the ROM at that length (reverify_corpus.rom_bytes) before comparing -- proven
+        through the REAL match.compare on the resolved bytes, not a stand-in."""
+        M, swarm = self._require_compile_stack()
+        import bytegate
+        import reverify_corpus
+        from unittest import mock
+        real = b"\x01\x00\x00\x00\x02\x00\x00\x00"        # the sized twin's ROM bytes
+        candidate = b"\x01\x00\x00\x00\x03\x00\x00\x00"   # one word off
+        with mock.patch.object(swarm, "oracle_check", return_value=(False, b"fake-obj")), \
+             mock.patch.object(M, "extract_func", return_value=(candidate, set())), \
+             mock.patch.object(bytegate, "alias_target_size", return_value=len(real)) as alt, \
+             mock.patch.object(reverify_corpus, "rom_bytes", return_value=real) as rb:
+            full = NDB.evaluate_full("asm double _dadd(...) { ... }", "_dadd", b"",
+                                     module="itcm", addr=0x01ff8000, size=0)
+        alt.assert_called_once_with("itcm", 0x01ff8000)
+        rb.assert_called_once_with("itcm", 0x01ff8000, len(real))
+        direct_ok, direct_ndiff = M.compare(real, candidate, set(), verbose=False)
+        self.assertEqual(full["divergences"], direct_ndiff)
+        self.assertEqual(full["ok"], direct_ok)
+        self.assertEqual(full["cand_size"], len(candidate))
+
+    def test_alias_row_that_byte_matches_its_sized_twin_reads_zero_and_ok(self):
+        """The MATCH case: once the size is resolved, a byte-exact candidate must
+        read divergences 0 / ok True -- the number reeval treats as bankable."""
+        M, swarm = self._require_compile_stack()
+        import bytegate
+        import reverify_corpus
+        from unittest import mock
+        real = b"\x01\x00\x00\x00\x02\x00\x00\x00"
+        with mock.patch.object(swarm, "oracle_check", return_value=(False, b"fake-obj")), \
+             mock.patch.object(M, "extract_func", return_value=(real, set())), \
+             mock.patch.object(bytegate, "alias_target_size", return_value=len(real)), \
+             mock.patch.object(reverify_corpus, "rom_bytes", return_value=real):
+            full = NDB.evaluate_full("asm double _dadd(...) { ... }", "_dadd", b"",
+                                     module="itcm", addr=0x01ff8000, size=0)
+        self.assertEqual(full["divergences"], 0)
+        self.assertTrue(full["ok"])
+
+    def test_nested_entry_point_is_found_inside_its_containing_symbol(self):
+        """A nested entry point (e.g. func_01ff98f4 inside func_01ff97d8.c's single
+        compiled symbol): `name` has no symbol of its own in the object at all --
+        extract_func(obj, name) and the sole-symbol fallback both miss. evaluate_full
+        must search every symbol the object DOES define for one that CONTAINS
+        name's ROM range, the exact address-anchored resolution
+        reloc_audit.resolve_nested_slice gives tools/linkcheck.py -- shared, not
+        re-derived, so the two can never disagree on which symbol a nested name
+        resolves against."""
+        M, swarm = self._require_compile_stack()
+        import probe_versions
+        import reloc_audit
+        from unittest import mock
+        container_code = b"\x11" * 0x10 + b"\x01\x00\x00\x00"   # nested func at +0x10
+        sliced = container_code[0x10:0x14]
+        target = b"\x02\x00\x00\x00"                             # one word off
+
+        def fake_extract(obj, sym):
+            if sym == "func_01ff98f4":
+                return None, None                # absent from the object by that name
+            return container_code, set()          # the containing symbol's full body
+
+        with mock.patch.object(swarm, "oracle_check", return_value=(False, b"fake-obj")), \
+             mock.patch.object(M, "extract_func", side_effect=fake_extract), \
+             mock.patch.object(M, "sole_func_symbol", return_value=None), \
+             mock.patch.object(probe_versions, "funcs_in",
+                               return_value={"func_01ff97d8": b""}), \
+             mock.patch.object(reloc_audit, "resolve_nested_slice",
+                               return_value=(sliced, set(), 0x10)) as rns:
+            full = NDB.evaluate_full("//asm container", "func_01ff98f4", target,
+                                     module="itcm", addr=0x01ff98f4, size=4, name_index={})
+        rns.assert_called_once_with("func_01ff97d8", container_code, set(),
+                                    0x01ff98f4, 4, {})
+        direct_ok, direct_ndiff = M.compare(target, sliced, set(), verbose=False)
+        self.assertEqual(full["divergences"], direct_ndiff)
+        self.assertEqual(full["ok"], direct_ok)
+        self.assertEqual(full["resolved"], "func_01ff97d8")
+
+    def test_no_container_found_still_reads_func_absent(self):
+        """No symbol in the object contains name's range either (resolve_nested_slice
+        returns None for every candidate): the row stays func-absent, same as before
+        this change -- the search must not fabricate a container that is not there."""
+        M, swarm = self._require_compile_stack()
+        import probe_versions
+        import reloc_audit
+        from unittest import mock
+        with mock.patch.object(swarm, "oracle_check", return_value=(False, b"fake-obj")), \
+             mock.patch.object(M, "extract_func", return_value=(None, None)), \
+             mock.patch.object(M, "sole_func_symbol", return_value=None), \
+             mock.patch.object(probe_versions, "funcs_in", return_value={}), \
+             mock.patch.object(reloc_audit, "resolve_nested_slice", return_value=None):
+            full = NDB.evaluate_full("", "func_01ff8df8", b"\x00" * 24,
+                                     module="itcm", addr=0x01ff8df8, size=24)
+        self.assertIsNone(full["divergences"])
+        self.assertEqual(full["status"], "func-absent")
+
+
+@unittest.skipUnless(
+    (TOOLS / "mwccarm" / "2004" / "b56" / "mwccarm.exe").is_file(),
+    "canonical (2004/b56) mwccarm not present")
+class RealCompileResolverFixtures(unittest.TestCase):
+    """Real compiles of the two committed sources tools/test_linkcheck.py's own
+    RealCompileFixtures were written for, run through evaluate_full instead of
+    linkcheck() -- proving the near-miss evaluator and the byte gate now agree on
+    both shapes using the SAME committed source, not just on mocked wiring."""
+
+    def test_dmul_scores_zero_when_evaluated_under_its_alias_row_shape(self):
+        """src/_dmul.c, fed to evaluate_full as if it were a near-miss row's own
+        c_source with the row's zero-declared size (the alias shape), must resolve
+        to the sized twin's real length and read a byte-exact MATCH -- divergences 0,
+        ok True -- the number reeval treats as bankable."""
+        import match as M
+        src = (TOOLS.parent / "src" / "_dmul.c").read_text(encoding="utf-8")
+        full = NDB.evaluate_full(src, "_dmul", b"", module="itcm", addr=0x01ff8708, size=0)
+        self.assertEqual(full["divergences"], 0)
+        self.assertTrue(full["ok"])
+
+    def test_nested_entry_point_scores_zero_from_the_containing_source(self):
+        """src/func_01ff97d8.c compiles to ONE ELF symbol, "func_01ff97d8", 0xb6c
+        bytes; func_01ff98f4 (config size 0xb0) has no symbol of its own anywhere in
+        that object. Fed to evaluate_full as func_01ff98f4's own c_source (the
+        nested shape: a stored near-miss draft that is really the whole containing
+        block), it must slice the containing symbol's compiled body at the right
+        address-resolved offset and read a byte-exact MATCH."""
+        import match as M
+        import reverify_corpus as RV
+        src = (TOOLS.parent / "src" / "func_01ff97d8.c").read_text(encoding="utf-8")
+        target = RV.rom_bytes("itcm", 0x01ff98f4, 0xb0)
+        full = NDB.evaluate_full(src, "func_01ff98f4", target,
+                                 module="itcm", addr=0x01ff98f4, size=0xb0)
+        self.assertEqual(full["divergences"], 0)
+        self.assertTrue(full["ok"])
+        self.assertEqual(full["resolved"], "func_01ff97d8")
+
+
+class PruneMatchedTests(unittest.TestCase):
+    """prune-matched must resolve a row's CURRENT state by address through a
+    consolidated TU, not only through the row's own (possibly stale) name.
+
+    The shape this covers: a merged TU can fold a ROM address into a
+    NEIGHBOUR's compiled body, leaving no symbols.txt row of its own at that
+    address (the nested-entry-point shape reloc_audit.resolve_nested_slice
+    resolves at the compiled-object level for linkcheck.py/pr_linkcheck.py --
+    func_01ff97d8.c is the real-tree example). Name-only resolution -- the old
+    prune_matched -- can never see that address again once nothing names it, so
+    a real match reads as open work forever. These tests are bare-interpreter:
+    filesystem and srcpath only, no compiler."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self._saved_db = NDB.DB
+        self.addCleanup(setattr, NDB, "DB", self._saved_db)
+        NDB.DB = pathlib.Path(tmp.name) / "db.jsonl"
+        import srcpath as SP
+        self.SP = SP
+        saved = (SP.REPO, SP.SRC)
+        self.addCleanup(self._restore_srcpath, saved)
+        SP.REPO = pathlib.Path(tmp.name)
+        SP.SRC = SP.REPO / "src"
+        SP.SRC.mkdir(parents=True, exist_ok=True)
+        SP.invalidate()
+        # nearmiss_db.REPO (used only to print a dropped row's path relative to the
+        # repo root) is the same notion of "repo root" as srcpath.REPO in a real
+        # checkout -- both tools live in the one tools/ directory -- so redirect it
+        # alongside srcpath's for the fixture to keep matching that reality.
+        self._saved_ndb_repo = NDB.REPO
+        self.addCleanup(setattr, NDB, "REPO", self._saved_ndb_repo)
+        NDB.REPO = SP.REPO
+
+    def _restore_srcpath(self, saved):
+        self.SP.REPO, self.SP.SRC = saved
+        self.SP.invalidate()
+
+    def write_rows(self, *rows):
+        NDB.DB.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+    def load_quiet(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            return NDB.load_db()
+
+    def write_src(self, rel, text):
+        p = self.SP.SRC / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+        self.SP.invalidate()
+        return p
+
+    def enrol(self, entries, symbols, module="arm9"):
+        """Same shape as test_srcpath.SrcPath.enrol: write a config/ symbols.txt +
+        delinks.txt pair at the path relocs.iter_symbol_files actually looks for."""
+        if module == "arm9":
+            cfg = self.SP.REPO / "config" / "arm9"
+        elif module in ("itcm", "dtcm"):
+            cfg = self.SP.REPO / "config" / "arm9" / module
+        else:
+            cfg = self.SP.REPO / "config" / "arm9" / "overlays" / module
+        cfg.mkdir(parents=True, exist_ok=True)
+        (cfg / "symbols.txt").write_text("".join(
+            "%s kind:function(arm,size=0x4) addr:0x%08x\n" % (n, a) for n, a in symbols))
+        lines = ["    .text       start:0x02000000 end:0x03000000 kind:code align:32", ""]
+        for rel, secs in entries:
+            lines.append(rel + ":")
+            lines.append("    complete")
+            lines += ["    .text start:0x%08x end:0x%08x" % (a, b) for a, b in secs]
+            lines.append("")
+        (cfg / "delinks.txt").write_text("\n".join(lines))
+        self.SP.invalidate()
+
+    def test_prune_matched_resolves_a_consolidated_tus_interior_address(self):
+        # 0x02100050 carries no symbols.txt row of its own (only the class's own
+        # method, at 0x02100000, does) -- NM.name_at (mocked as the real one would
+        # answer for an absorbed address) has nothing to offer, and path_for on
+        # the row's own stale placeholder finds nothing either. Only owner_at's
+        # raw range containment can still see it.
+        self.write_src("actors/Foo_c.cpp", "int Foo_Behavior(void) { return 1; }\n")
+        self.enrol([("src/actors/Foo_c.cpp", [(0x02100000, 0x02100100)])],
+                   [("_ZN5Foo_c8BehaviorEv", 0x02100000)])
+        self.write_rows(row(37, module="arm9", addr="0x02100050", name="func_02100050"))
+        with mock.patch("names.name_at", return_value=None):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.prune_matched(argparse.Namespace(dry_run=True))
+            self.assertIn("1 ghost entries", out.getvalue())
+            self.assertIn("actors/Foo_c.cpp", out.getvalue())
+            with contextlib.redirect_stdout(io.StringIO()) as out2:
+                NDB.prune_matched(argparse.Namespace(dry_run=False))
+            self.assertIn("dropped 1 ghost", out2.getvalue())
+        db = self.load_quiet()
+        self.assertEqual(db, {})
+
+    def test_prune_matched_leaves_a_genuinely_unenrolled_row_alone(self):
+        """A sourceless hole -- a gap between delinks entries -- must not be
+        pruned: the cartridge's own bytes still stand there, and this is exactly
+        the shape that must not be confused with a consolidated-TU ghost."""
+        self.write_src("actors/Foo_c.cpp", "int Foo_Behavior(void) { return 1; }\n")
+        self.enrol([("src/actors/Foo_c.cpp", [(0x02100000, 0x02100100)])],
+                   [("_ZN5Foo_c8BehaviorEv", 0x02100000)])
+        self.write_rows(row(113, module="arm9", addr="0x02100200", name="func_02100200"))
+        with mock.patch("names.name_at", return_value=None):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.prune_matched(argparse.Namespace(dry_run=True))
+        self.assertIn("0 ghost entries", out.getvalue())
+        db = self.load_quiet()
+        self.assertEqual(len(db), 1)
+
+    def test_prune_matched_leaves_a_bannered_consolidated_tu_row_open(self):
+        """A promoted TU that still carries the NONMATCHING draft banner is not a
+        ghost: the function is still open work, just parked mid-migration, so
+        pruning it here would silently delete a live near-miss draft."""
+        self.write_src("actors/Foo_c.cpp",
+                        "// NONMATCHING: hand-written asm, does NOT count as matched\n"
+                        "int Foo_Behavior(void) { return 1; }\n")
+        self.enrol([("src/actors/Foo_c.cpp", [(0x02100000, 0x02100100)])],
+                   [("_ZN5Foo_c8BehaviorEv", 0x02100000)])
+        self.write_rows(row(37, module="arm9", addr="0x02100050", name="func_02100050"))
+        with mock.patch("names.name_at", return_value=None):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.prune_matched(argparse.Namespace(dry_run=True))
+        self.assertIn("0 ghost entries", out.getvalue())
+        db = self.load_quiet()
+        self.assertEqual(len(db), 1)
+
+    def test_prune_matched_prunes_a_hand_asm_bannered_row_via_address_fallback(self):
+        """The ghost test is asm_policy.counts_as_matched, not a re-spelling of
+        "no NONMATCHING banner" -- a HAND-ASM PRIMITIVE file also carries the word
+        NONMATCHING (the 2026-09-09 ruling), so a plain draft-banner check would
+        wrongly leave it open. This combines that with the address-fallback shape:
+        the row sits at a consolidated TU's interior address with no symbols.txt
+        row of its own, so only owner_at can find the file at all, and only
+        counts_as_matched (not has_draft_banner) can tell it is done."""
+        self.write_src("actors/Foo_c.cpp",
+                        "// HAND-ASM PRIMITIVE\n"
+                        "// NONMATCHING: byte-exact hand-written asm, no C to recover\n"
+                        "asm int Foo_Behavior(void) { mrs r0, cpsr; bx lr; }\n")
+        self.enrol([("src/actors/Foo_c.cpp", [(0x02100000, 0x02100100)])],
+                   [("_ZN5Foo_c8BehaviorEv", 0x02100000)])
+        self.write_rows(row(1, module="arm9", addr="0x02100050", name="func_02100050"))
+        with mock.patch("names.name_at", return_value=None):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.prune_matched(argparse.Namespace(dry_run=True))
+        self.assertIn("1 ghost entries", out.getvalue())
+        self.assertIn("actors/Foo_c.cpp", out.getvalue())
+
+    def test_prune_matched_still_resolves_an_ordinary_rename_by_name(self):
+        """Baseline: an address whose CURRENT symbol is a plain rename (no
+        containment fallback needed) must still be caught -- the new address
+        fallback must not have cost the ordinary case anything."""
+        self.write_src("Foo_Init.c", "int Foo_Init(void) { return 1; }\n")
+        self.enrol([("src/Foo_Init.c", [(0x02100000, 0x02100004)])],
+                   [("Foo_Init", 0x02100000)])
+        self.write_rows(row(9, module="arm9", addr="0x02100000", name="func_02100000"))
+        with mock.patch("names.name_at", return_value="Foo_Init"):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                NDB.prune_matched(argparse.Namespace(dry_run=True))
+        self.assertIn("1 ghost entries", out.getvalue())
+        self.assertIn("Foo_Init.c", out.getvalue())
 
 
 class EvalPinGuardTests(unittest.TestCase):
@@ -321,8 +874,11 @@ class EvalPinGuardTests(unittest.TestCase):
         # Flags are gated too, not just the compiler and the metric. -O4,p -> -O2
         # re-scores every stored source far harder than a compiler bump does, and the
         # pin already records `flags`, so leaving it out of the assertion made the
-        # pin's own field decorative. cpp_flags is derived from DEFAULT_FLAGS
-        # (swarm.CPP_FLAGS), so gating flags covers the C++ lane as well.
+        # pin's own field decorative. The C++ lane (swarm.CPP_FLAGS) is DEFAULT_FLAGS
+        # plus the language flip plus `-Cpp_exceptions off`, so gating DEFAULT_FLAGS
+        # gates everything the two lanes share; the one extra flag is deliberately not
+        # in DEFAULT_FLAGS, and it is inert on all but one of the DB's //cpp rows
+        # (measured: tools/match.py CPP_EXCEPTIONS_FLAG, notes 6co).
         self.assertEqual(
             (pin.get("canonical"), pin.get("metric"), pin.get("flags")),
             (live["CANONICAL"], NDB.METRIC_REV, live["DEFAULT_FLAGS"]),

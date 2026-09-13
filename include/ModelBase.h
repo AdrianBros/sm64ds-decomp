@@ -95,7 +95,43 @@ struct ModelBase {
     ModelBase();
 
     /* --- vtable, in ROM order at 0x0208e87c. Do not reorder. --- */
+    /* THE DESTRUCTOR PAIR, SPELLED AS TWO PLAIN VIRTUALS ON THE HOST. mwccarm
+       gives `virtual ~ModelBase()` TWO vtable entries -- the Itanium D1
+       complete / D0 deleting pair this header's own map reads out of the ROM
+       at slots 0 and 1 -- and MSVC folds them into ONE. Spelt as a destructor
+       the declaration indexes correctly on the ARM and ONE SLOT EARLY on the
+       host, for every virtual declared after it and all the way down the
+       hierarchy: ModelBase -> Model -> ModelAnim -> {ModelAnim2,
+       BlendModelAnim}, plus the CommonModel and ShadowModel siblings.
+
+       MEASURED, not reasoned: the ROM's _ZTV9ModelAnim at 0x0208e980 reads
+       [0] D1, [1] D0, [2] Model::DoSetFile, [3] UpdateVerts, [4] Virtual10,
+       [5] Render, [6] Virtual18, while MSVC's own
+       /d1reportSingleClassLayoutModelAnim dropped D0 and read [1] DoSetFile
+       ... [4] Render, [5] Virtual18 -- one slot early from index 1 on, and the
+       missing word is exactly D0.
+
+       Two ordinary virtuals occupy the same two entries under MSVC that the
+       destructor pair occupies under mwccarm, so spelling them out on the host
+       makes MSVC's numbering the ROM's numbering. The guard keeps the ARM side
+       untouched: nothing in this tree defines _MSC_VER, so mwccarm still sees
+       the destructor and no ROM byte moves. Neither name is ever called; they
+       hold the two slots the ROM's table holds.
+
+       The NON-VIRTUAL `~ModelBase()` beside them is what lets the thirteen
+       destructor translation units in src/ keep defining `X::~X()` out of
+       class: without a declaration MSVC refuses the definition outright
+       (C2600) and no host option reaches it. Being non-virtual it takes no
+       slot and moves no field -- /d1reportSingleClassLayoutModelBase with it
+       present still reads size(8) and [0] Destructor1, [1] Destructor0,
+       [2] DoSetFile. */
+#ifdef _MSC_VER
+    virtual void Destructor1();                      /* slot 0 (D1) */
+    virtual void Destructor0();                      /* slot 1 (D0) */
+    ~ModelBase();                                    /* no slot: see above */
+#else
     virtual ~ModelBase();                            /* slots 0 (D1), 1 (D0) */
+#endif
     virtual int DoSetFile(char *file, int a, int b) = 0;  /* slot 2, null here */
 
     /* --- non-virtual --- */
@@ -125,8 +161,11 @@ struct ModelBase {
 
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char ModelComponents_size_must_be_0x14[sizeof(ModelComponents) == 0x14 ? 1 : -1];
 typedef char ModelBase_size_must_be_0x8[sizeof(ModelBase) == 0x8 ? 1 : -1];
+#endif
 
 #else
 
