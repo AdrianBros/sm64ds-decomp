@@ -151,6 +151,26 @@ struct State2i { int a; int b; };
 struct S18a { short f0; char pad[0x16]; };
 struct S18b { u16 f0; char pad[0x16]; };
 struct S18b2 { short a; short b; int c[5]; };
+/* Two shadow scaffolds, hoisted for the same reason as the block above and one
+ * more: C++ requires every virtual of a LOCAL class to be defined in the same
+ * body, because a local class's vtable can have nowhere else to come from.
+ * Neither scaffold is ever constructed -- each exists only to give a call
+ * through a pointer the ROM's vtable-slot shape (see the note on
+ * Player::CanEnterDoor) -- so at file scope the declarations are enough and
+ * no vtable is emitted on either compiler. */
+struct StarDoor {
+ virtual int v00(); virtual int v01(); virtual int v02(); virtual int v03();
+ virtual int v04(); virtual int v05(); virtual int v06(); virtual int v07();
+ virtual int v08(); virtual int v09(); virtual int v10(); virtual int v11();
+ virtual int v12(); virtual int v13(); virtual int v14(); virtual int v15();
+ virtual int v16(); virtual int v17();
+ virtual int GetType();
+};
+struct ObjHS {
+ virtual void v0();
+ virtual void v1();
+ virtual ObjHS* v2();
+};
 
 /* -------------------------------------------------------------------------- */
 /* ROM ordinal 0 -- _ZN6Player8CanPauseEv, 0x020bd828, size 0x84 */
@@ -8936,14 +8956,6 @@ int Player::TryEnterStarDoor(Vector3 & pos_, short kind)
 extern "C" {
 int Player::CanEnterDoor(unsigned char door)
 {
-    struct StarDoor {
-        virtual int v00(); virtual int v01(); virtual int v02(); virtual int v03();
-        virtual int v04(); virtual int v05(); virtual int v06(); virtual int v07();
-        virtual int v08(); virtual int v09(); virtual int v10(); virtual int v11();
-        virtual int v12(); virtual int v13(); virtual int v14(); virtual int v15();
-        virtual int v16(); virtual int v17();
-        virtual int GetType();
-    };
     extern void _ZN6Player11ChangeStateERNS_5StateE(void*, void*);
     extern int _ZN6Player17SetNoControlStateEhih(void*, unsigned char, int, unsigned char);
     extern int data_ov002_0211022c[];
@@ -9488,11 +9500,6 @@ ret0a:
 extern "C" {
 int Player::St_Headstand_Main()
 {
-    struct ObjHS {
-        virtual void v0();
-        virtual void v1();
-        virtual ObjHS* v2();
-    };
     extern int _ZN6Player12FinishedAnimEv(void*);
     extern int _ZN6Player7SetAnimEji5Fix12IiEj(void*, unsigned int a, int b, int d, unsigned int e);
     extern void _ZN6Player11ChangeStateERNS_5StateE(void*, void*);
