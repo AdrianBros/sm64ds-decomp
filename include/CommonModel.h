@@ -46,7 +46,17 @@ struct CommonModel : ModelBase {
     CommonModel();
 
     /* --- vtable, in ROM order. Do not reorder. --- */
+    /* The destructor pair spelled as two plain virtuals on the host, plus the
+       non-virtual destructor declaration the src/ definitions need; the whole
+       ruling is in include/ModelBase.h. Overrides take their base's slots, so
+       these carry the SAME TWO NAMES ModelBase declares. */
+#ifdef _MSC_VER
+    virtual void Destructor1();                       /* slot 0 (D1) */
+    virtual void Destructor0();                       /* slot 1 (D0) */
+    ~CommonModel();                                   /* no slot */
+#else
     virtual ~CommonModel();                           /* slots 0 (D1), 1 (D0) */
+#endif
     virtual int DoSetFile(char *file, int a, int b);  /* slot 2 */
 
     /* --- non-virtual --- */
@@ -55,7 +65,10 @@ struct CommonModel : ModelBase {
     void Func_020160AC(u32 flags);   /* ORs flags into every material */
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char CommonModel_size_must_be_0x3c[sizeof(CommonModel) == 0x3c ? 1 : -1];
+#endif
 
 #else
 

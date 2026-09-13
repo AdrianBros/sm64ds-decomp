@@ -13,7 +13,7 @@
  * cartridge vtable for the MG_HANACHAN registry profile.
  */
 extern "C" void __cxa_vec_cleanup(void *arr, int count, int elemSize, void *dtor);
-extern "C" void func_ov006_020ea324(void);
+extern "C" void *func_ov006_020ea324(void);
 
 /* dScMgHanachan_c : dScMgBase_c, confirmed leaf via tools/rtti_extract.py
    (no RTTI record names it as a base). Own vtable slots: 0 (InitResources),
@@ -65,6 +65,9 @@ struct dScMgHanachan_c : dScMgBase_c {
     u8  unk_4f64;            /* 0x4f64 */
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char dScMgHanachan_c_size_must_be_0x4f68[sizeof(dScMgHanachan_c) == 0x4f68 ? 1 : -1];
+#endif
 
 #endif

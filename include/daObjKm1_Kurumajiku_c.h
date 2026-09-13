@@ -70,16 +70,19 @@ struct daObjKm1_Kurumajiku_c : daObjKurumajiku_c {
        rather than a hand-rolled operator-new call and a pair of raw vptr
        stores. include/daObjKm1_Kuruma_c.h carries the same pairing for the
        cart this axle drives. */
-    static void *operator new(unsigned long size);
+    static void *operator new(size_t size);
 };
 
-inline void *daObjKm1_Kurumajiku_c::operator new(unsigned long size)
+inline void *daObjKm1_Kurumajiku_c::operator new(size_t size)
 {
     return _ZN7fBase_cnwEj((unsigned)size);
 }
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daObjKm1_Kurumajiku_c_size_must_be_0x330[
     sizeof(daObjKm1_Kurumajiku_c) == 0x330 ? 1 : -1];
+#endif
 
 #endif /* __cplusplus */
 

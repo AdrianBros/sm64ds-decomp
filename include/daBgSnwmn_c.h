@@ -91,7 +91,7 @@ struct daBgSnwmn_c : dActor_c {
     virtual s32  Render();                                /* slot  9 */
     virtual void OnPendingDestroy();                      /* slot 12 */
 
-    static void *operator new(unsigned long size) {
+    static void *operator new(size_t size) {
         return _ZN7fBase_cnwEj((unsigned)size);
     }
 
@@ -100,6 +100,9 @@ struct daBgSnwmn_c : dActor_c {
     virtual ~daBgSnwmn_c() {}                            /* slots 16 (D1), 17 (D0) */
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daBgSnwmn_c_size_must_be_0x1f0[sizeof(daBgSnwmn_c) == 0x1f0 ? 1 : -1];
+#endif
 
 #endif

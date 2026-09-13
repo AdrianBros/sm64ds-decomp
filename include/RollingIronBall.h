@@ -25,7 +25,7 @@
  * the destructor leaves the class eight bytes short.
  *
  * (InitResources still does not reproduce -- a size disagreement, not a
- * compile error. That predates this header: it fails identically on 1b45f57b,
+ * compile error. That predates this header: it fails identically on ff7872bf,
  * where the class was still flat. Its body carries laundering hacks and a
  * volatile read and wants its own matching session. Every other function of
  * this class reproduces.)
@@ -102,6 +102,9 @@ struct RollingIronBall : dEnemyBase_c {
     int Render();
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char RollingIronBall_size_must_be_0x3fc[sizeof(RollingIronBall) == 0x3fc ? 1 : -1];
+#endif
 
 #endif /* ROLLINGIRONBALL_H */
