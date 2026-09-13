@@ -331,10 +331,21 @@ class GateStillWorksTests(unittest.TestCase):
 # forced-update, the 2026-09-13 scrub. The reason to stop pinning anyway is that the
 # material that triggered it is still here. The scrub was over a personal Windows
 # username in a hardcoded path -- tools/ovsweep.py:48, which now reads
-# `C:/Users/tango/...` -- and origin/main still spells five such paths under a different
-# username across four tracked files (notes/agents/LAUNCH.md,
-# notes/agents/references/pipeline-v1.md, notes/real-cpp-migration-runbook.md x2,
-# notes/tu-cpp-census-2026-08.md). The maintainer designed for the repeat: repin's
+# `C:/Users/tango/...` -- and origin/main @ 1224afd11 still spells THIRTY-ONE paths of
+# that shape across six tracked files, sixteen under one username and fourteen under
+# another:
+#
+#     git grep -ohE 'C:[\\/]{1,2}Users[\\/]{1,2}(andre|alexs|tango)' origin/main -- .
+#
+#     25  config/match_attempts.jsonl        1  notes/tu-cpp-census-2026-08.md
+#      2  notes/real-cpp-migration-runbook.md    1  notes/agents/LAUNCH.md
+#      1  notes/agents/references/pipeline-v1.md 1  tools/ovsweep.py
+#
+# Twenty-five of the thirty-one are recorded "srcPath" values in
+# config/match_attempts.jsonl -- a generated log that keeps growing -- so the exposure is
+# not a handful of stale notes, and it is not static. Mind the separator when re-checking:
+# JSON escapes the path, so those 25 read `C:\\Users\\...` and a pattern matching a single
+# separator misses every one of them. The maintainer designed for the repeat: repin's
 # `--check` is documented as "the same predicate a pre-merge gate would use", dc3dbbdfa
 # swapped a real corpus id in tools/test_repin_commit_ids.py for a synthetic
 # `a1a1a1a1...` "so the test stays hermetic and idempotent under a future re-sweep", and
