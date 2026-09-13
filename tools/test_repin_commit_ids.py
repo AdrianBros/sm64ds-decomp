@@ -21,8 +21,8 @@ sys.path.insert(0, str(TOOLS))
 
 import repin_commit_ids as R  # noqa: E402
 
-OLD_A = "19df96cc21d5e2a87a97a22d4de67191319505bd"
-NEW_A = "05213cf8f80f8b9f20f4f25d7e914ebfb2148533"
+OLD_A = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+NEW_A = "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
 OLD_B = "9c7f38a24aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 NEW_B = "5555bb3f483ea2d3ce28c38dcbc19a63e6e489ab"
 # Two old ids sharing the 7-char prefix "abc1234" -- any token of that length must be
