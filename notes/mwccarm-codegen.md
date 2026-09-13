@@ -5641,3 +5641,122 @@ Both re-measured with the same role-scored harness, so the frontier is honest.
   is **byte-identical** to the function-scope draft every time. mwccarm flattens the
   scopes before colouring here, so block depth is only a lever where the web is a real
   CSE candidate the depth can re-rank. 6bn's floor statement stands unchanged.
+
+## 6cf. A MATCHED twin with its pragma removed is the cheapest oracle for a pragma-class residue, and the optimisation pragmas are per FUNCTION, so an inlined helper cannot carry its own (func_ov080_021261f4, div 5, floor; 2026-09-13, run link100 lane CRK-F)
+
+`func_ov080_021261f4` (ov080 0x021261f4, 0x2f8) is a terrain render routine. 185 of its 190
+words are exact and the size is exact; the whole residue is five words inside the
+`G3_TexImageParam` pack:
+
+```text
+    +0xa4  ROM ldr r2,[r2]            OURS ldr r3,[r2]
+    +0xa8  ROM lsr r3,r0,#0x1a        OURS lsr r2,r0,#0x1a
+    +0xac  ROM and r3,r3,#7           OURS lsr r3,r3,#3      SCHED
+    +0xb0  ROM lsr r2,r2,#3           OURS and r2,r2,#7      SCHED
+    +0xb4  ROM orr r2,r2,r3,lsl #26   OURS orr r2,r3,r2,lsl #26
+```
+
+The operand ROLES already agree (`Rn` is `addr >> 3`, the shifter operand is `texFmt & 7`).
+Only the names, and the order of the two independent single-cycle ops, are wrong.
+
+**The control that named it.** `func_ov080_02125460` is this function's twin, it is MATCHED
+in `src/`, and it carries one line the draft does not: `#pragma opt_propagation off`. Delete
+that line from the matched file and recompile it and it drops to div 5 of 63 with THE SAME
+FIVE-WORD SHAPE at its own +0x60..+0x7c: same register transposition, same `and`/`lsr`
+inversion. So the residue is not a spelling problem. It is what this GX texture-parameter
+pack (`addr >> 3` ORed with a shifted masked field) compiles to when copy propagation is on,
+and the ROM's build of both bodies had it off across that window.
+
+**Carry the method, not just the case.** When a near-miss sits next to a function that
+already matches and does the same work, diff the two SOURCES first and turn off whatever the
+matched one turns on. One compile decides whether the residue is a mode-level difference
+before any spelling is attempted. Five hundred sixty compiles of spellings on this body
+found nothing; the control found the mechanism on the first try.
+
+**The granularity limit, which is why this is still a floor.** The pragma cannot simply be
+adopted here. This body is 0x2f8 against the twin's 0xfc; `opt_propagation off` takes the
+draft from 5 to 87, about 69 of them outside the pack window (the whole vertex loop
+re-colours), and it does not even reproduce the ROM's window: under the pragma this function
+emits the TWIN's schedule (all four `lsr`s first, then the `and`s), which the ROM does not
+have here. mwcc applies the optimisation pragmas per FUNCTION, so there is no source-side way
+to scope one to a region: the pragma wrapped around the `static inline G3_TexImageParam`
+definition is inert at 5, because the inlined body is compiled under the caller's settings.
+
+**Measured inert on this body, on top of the prior lane's ~760 compiles.** The twin's own SDK
+helper in both parameter orders, with and without a named pointer and a named param word,
+and with `int` and with `GXTexFmt`-style enum parameters; masks named and spelled first; a
+named register pointer and a laundered pool address for 0x40004a8; a named accumulator; a
+laundered, `const`, bare-`*obj` and `(char *)obj + 0` spelling of the `addr` load; a
+one-element array temp and a union temp for it; `register` on the value, the field, the
+pointer and both. A 172-cell 6cc joint rank x type-name climb over the pack's seven locals,
+hoisted to the function's top declaration block so they have a rank at all (the hoist is free
+and byte-identical). A 32-cell 6cd dead-assignment sweep at four insertion points ahead of
+the pack. The full 246-name pragma vocabulary at on and off, 449 compiled cells, inert at 5
+everywhere except `opt_arithtransformation off` 29, `opt_dead_assignments off` 80 and
+`opt_propagation off` 87. All 25 installed builds: 2004/b56, 1.2/base, 1.2/sp2 and 1.2/sp2p3
+all give exactly 5, the other 21 are structural. decomp-permuter, 4,494 iterations over
+70 minutes at -j4, never beat its base score of 230.
+
+**One clean negative worth keeping: bitfields are not how this pack is spelled.** Reading the
+fields through a `u32 x : 3` bitfield struct makes mwcc emit `lsl` + `lsr` pairs, not
+`lsr` + `and`, and costs 6 more words (div 11 in both LSB and MSB field orders). Wherever a
+ROM window shows `lsr rD,rS,#n` followed by `and rD,rD,#mask`, the original spelled the
+shift and the mask out by hand.
+
+## 6cg. A vector built from three member reads: fold the added constant into the TEMP's initialiser and read the component that carries it LAST (func_ov002_020bb614, div 7 -> 0, 2026-09-13, run link100 lane CRK-F)
+
+`func_ov002_020bb614` (ov002 0x020bb614, 0x3dc) is SignPost's talk routine. It sat at the
+stored draft's 7 with a banner calling it a "conditional-cast shift-pair split vs load-hoist
+collision (6be)" floor after ten prologue shapes on top of 6be's own sweep. The body from
++0x44 on was already byte-identical; all seven words were the message-anchor build:
+
+```text
+    ROM                               draft (div 7)
+    +0x20 ldr r1,[r6,#0x60]   y       ldr r5,[r6,#0x598]  player
+    +0x24 ldr r5,[r6,#0x598]  player  lsrne r4,r0,#0x10
+    +0x28 lsrne r4,r0,#0x10           ldr r0,[r6,#0x60]   y
+    +0x30 ldr r0,[r6,#0x5c]   x       ldr r1,[r6,#0x5c]   x
+    +0x34 add r1,r1,#0x50000          add r0,r0,#0x50000
+    +0x38 str r1,[sp,#0xc]    y       str r1,[sp,#8]      x
+    +0x40 str r0,[sp,#8]      x       str r0,[sp,#0xc]    y
+```
+
+Two edits close it completely:
+
+```c
+    mx = *(s32 *)(c + 0x5c);
+    mz = *(s32 *)(c + 0x64);
+    my = *(s32 *)(c + 0x60) + 0x50000;   /* the constant on the TEMP, not the store */
+    msgPos.x = mx;
+    msgPos.y = my;
+    msgPos.z = mz;
+```
+
+**Why it works, and why it is one axis and not two.** The ROM leaves a scheduling gap between
+`lslne r0,r1,#0x10` and `lsrne r4,r0,#0x10` and fills it with two loads. The `0x60` load only
+reaches that gap when its temp carries the `+ 0x50000` itself: the add gives the load a
+consumer far enough downstream for the scheduler to hoist it. It has to be the LAST of the
+three reads as well, because that is the point where `r1` (the message-id parameter) has just
+died, and `r1` is what the ROM gives the height. Fixing the schedule fixes the colouring for
+free -- the five words that were being read as a colouring residue were a consequence, not a
+second problem.
+
+**The full 72-cell landscape**, 3 temp-read orders x 3 store orders x {constant on the temp
+initialiser | constant on the store}, every cell compiling to the exact 0x3dc:
+
+```text
+    constant on the STORE   : 7 or 9 in every one of the 36 cells, no exceptions
+    constant on the TEMP    : 0   read order xzy / zxy / zyx with store order xyz or xzy
+                              4   store order zxy / zyx
+                              6   read order xyz / yxz / yzx with store order xyz or xzy
+                              8-9 any store order beginning with y
+```
+
+The `Kill()` idiom that the rest of this class uses (read x, y+K, z in order, then store x, y,
+z) is the div-6 cell, one step off. Sweep the two halves TOGETHER, the way 6cc says: the
+constant's position alone never leaves 7, and the read order alone never leaves 6.
+
+**Adjacent finding, worth a line.** `include/decl_common.h` is generated and types
+`Vec3_ApproachHorz` as returning `void`. This body compares its result against zero and the
+ROM does `bl` then `cmp r0,#0`, so it returns a value. A file that needs the real return type
+declares it locally and does not include `decl_common.h`; the generated header was left alone.
