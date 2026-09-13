@@ -5529,9 +5529,9 @@ move it.
 ### 6cd addendum: the lever is exhausted at three stores, and four neighbouring axes do not extend it (run link100 wave 9, lane CRK-A, 2026-09-13)
 
 The 13 words above were re-attacked from the banked div-13 source with the levers that
-landed the night before. Every axis below is flat: 1,400-odd compiles, not one cell under
-13, and the residue is still the same `i`/`off` pair swap. Reading the roles out of both
-loops explains why the two are hard to separate:
+landed the night before. Every axis below is flat: 3,500 compiles, not one cell under 13,
+and the residue is still the same `i`/`off` pair swap. Reading the roles out of both loops
+explains why the two are hard to separate:
 
 ```text
     loop 1 (flag == 1)   n=r4  data=r5  off=r6  j=r7  row=r8  i=sl
@@ -5570,8 +5570,15 @@ wraps `i`; every source shape we can reach wraps `off`. Nothing else in either l
   `opt_lifetimes off` 64, `opt_dead_assignments off` 92, `opt_propagation off` 97. The third
   of those is the lever's own mechanism seen from the other side: with dead-assignment
   elimination off the three stores are emitted and the body loses 79 words.
-* **The permuter, 90 minutes at -j4 on the div-13 base, 6,800 candidates, never beat the
-  base score of 70.**
+* **Statement order in either loop's preamble is flat.** All 1,260 orderings of loop 2's
+  seven preamble statements and all 60 of loop 1's that respect the two real dependencies
+  (`masked` before `off`, `i` before `j = i`) compile to 13. Nine web-structure variants
+  (inlining `masked` in one loop or both, inlining `k842` and `n`, `off` as a multiply or
+  in two steps, pre-increment, the `for` form) and five control-flow spellings (an explicit
+  `else`, `1 == flag`, a `goto` past loop 1, a trailing return) are 13 as well. Only
+  transposing the two increments at the bottom of loop 2 moves it, to 15.
+* **The permuter, 90 minutes at -j4 on the div-13 base, 7,238 candidates, never beat the
+  base score of 70, and a second run from the same base behaved the same.**
 
 ## 6ce. A launder on a pool address picks which of two entry-block attractors wins the switch selector's register (func_ov063_02117cdc, div 3, 2026-09-12, run link100 lane DCHEAP)
 
@@ -5632,7 +5639,13 @@ and nothing lies between or below them. Ten spellings reach the laundered attrac
 * **The full 246-name pragma vocabulary at on and off, 492 cells, produces nothing below 3**,
   and all 25 installed builds were swept: `MATCHING VERSIONS: none` (1.2/base, 1.2/sp2 and
   1.2/sp2p3 also give the same 3 words; every 2.0 and dsi build changes the body).
-* **The permuter, 90 minutes at -j3, 3,800 candidates, never beat the base score of 15.**
+* **Switch case order in the source is not a free axis.** mwccarm does not sort cases:
+  source order is block layout, so swapping two adjacent cases already costs 37 words and
+  a rotation 429. Do not reach for it on a body whose layout is already exact.
+* **The permuter, 90 minutes at -j3, 4,527 candidates, never beat the base score of 15 and
+  banked no improvement at all. A second run started from the OTHER attractor (the plain
+  address, base 25) never reaches the div-3 one, so the two basins are separated by a
+  barrier its transformations do not cross.**
 
 **What this body says about 6bs.** 6cc asks for a check before banking a regperm residue as
 the "does not recycle a just-died register" build delta: look at the ROM's own output for a
