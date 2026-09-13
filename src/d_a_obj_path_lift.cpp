@@ -30,7 +30,10 @@ extern "C" daObjPathLift_c *daObjPathLift_c_classInit()
             actor->mModels, 3, sizeof(Model),
             (void *)_ZN5ModelC1Ev, (void *)_ZN5ModelD1Ev);
         _ZN7PathPtrC1Ev(&actor->mPath);
-        *(int *)actor = (int)&_ZTV15daObjPathLift_c[2];
+        /* This TU imports the vtable. symbols.txt names _ZTV at the object
+         * start 0x0214857c; ROM classInit relocates there. [2] is the
+         * emitting-TU spelling and lands the reloc on 0x02148584. */
+        *(int *)actor = (int)&_ZTV15daObjPathLift_c[0];
         _ZN11ShadowModelC1Ev(&actor->mShadowModel);
     }
     return actor;
