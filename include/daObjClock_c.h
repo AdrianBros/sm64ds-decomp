@@ -17,7 +17,7 @@
  * the same 0x02112200 address point and is gone from symbols.txt.
  *
  * ONE CLASS, TWO PROFILES. CLOCK_SHORT (actor 292) and CLOCK_LONG (actor 293)
- * each own a descriptor and a byte-identical factory, and both install this
+ * each own a descriptor and a separate factory, and both install this
  * one vtable and the same 0x128 allocation. InitResources tells them apart at
  * run time by actorID and stores the answer in mHandIndex.
  *
@@ -50,9 +50,11 @@ struct daObjClock_c : dActor_c {
        _ZTV/_ZTI/_ZTS group -- exactly what the promotion needs it to be. --- */
     virtual ~daObjClock_c() {}         /* slots 16 (D1), 17 (D0) */
 
-    /* --- overrides of inherited fBase_c slots dActor_c left untouched. The
-       ROM installs all four in the vtable at 0x02112200; they were declared
-       as ordinary methods here before, which contradicted the cartridge. --- */
+    /* --- overrides of inherited fBase_c slots dActor_c left untouched.
+       The ROM installs all four in the vtable at 0x02112200. Matching an
+       inherited virtual signature already makes an override virtual without
+       repeating the keyword. These explicit declarations document that role;
+       the inline destructor and declaration order above control TU emission. --- */
     virtual int InitResources();       /* slot 0 -- 0x021115cc */
     virtual int CleanupResources();    /* slot 3 -- 0x02111478 */
     virtual int Behavior();            /* slot 6 -- 0x021114cc */
@@ -61,7 +63,10 @@ struct daObjClock_c : dActor_c {
 
 /* Holds the chain to the size both factories' operator new(0x128) evidences.
    A silently-added member anywhere fails this. */
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daObjClock_c_size_must_be_0x128[sizeof(daObjClock_c) == 0x128 ? 1 : -1];
+#endif
 
 #endif /* __cplusplus */
 
