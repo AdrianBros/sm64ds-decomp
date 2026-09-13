@@ -20,7 +20,7 @@ of the initializer was never changed. On `main` today:
   manifest records that the initializer, its `.ctor` word, the PMF input
   table, the resource globals, and the state-table BSS remain separately
   enrolled;
-- [src/d_a_brq.c](../src/d_a_brq.c) holds the factory `daBrq_c_classInit` (historical project
+- [src/game/actors/daBrq_c.cpp](../src/game/actors/daBrq_c.cpp) holds the factory `daBrq_c_classInit` (historical project
   alias `Amp_Spawn`), enrolled outside the class TU because the pinned
   compiler cannot express placement construction against the retail `fBase_c`
   allocator. That factory is the nineteenth `daBrq_c` symbol in the overlay;
