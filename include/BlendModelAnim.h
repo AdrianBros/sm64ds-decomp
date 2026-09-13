@@ -32,7 +32,17 @@ struct BlendModelAnim : ModelAnim {
     void *unk_6c;              /* 0x6c - owned; D1 deletes it */
 
     /* --- vtable order. Do not reorder. --- */
+    /* The destructor pair spelled as two plain virtuals on the host, plus the
+       non-virtual destructor declaration the src/ definitions need; the whole
+       ruling is in include/ModelBase.h. Overrides take their base's slots, so
+       these carry the SAME TWO NAMES ModelAnim declares. */
+#ifdef _MSC_VER
+    virtual void Destructor1();                           /* slot 0 (D1) */
+    virtual void Destructor0();                           /* slot 1 (D0) */
+    ~BlendModelAnim();                                    /* no slot */
+#else
     virtual ~BlendModelAnim();                            /* slots 0 (D1), 1 (D0) */
+#endif
     virtual int DoSetFile(char *file, int a, int b);      /* slot 2 */
     virtual void UpdateVerts();                           /* slot 3 */
     virtual void Virtual10(Matrix4x3 &mat);               /* slot 4 */

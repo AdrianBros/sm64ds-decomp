@@ -54,7 +54,19 @@ struct Model : ModelBase {
     Model();
 
     /* --- vtable, in _ZTV5Model order. Do not reorder. --- */
+    /* The destructor pair spelled as two plain virtuals on the host, plus the
+       non-virtual destructor declaration the src/ definitions need; the whole
+       ruling, and the ROM-vs-MSVC layout measurement behind it, is in
+       include/ModelBase.h. An override takes its base's slots, so these carry
+       the SAME TWO NAMES the base declares -- a fresh name would append a slot
+       instead of claiming one. */
+#ifdef _MSC_VER
+    virtual void Destructor1();                       /* slot 0 (D1) */
+    virtual void Destructor0();                       /* slot 1 (D0) */
+    ~Model();                                         /* no slot */
+#else
     virtual ~Model();                                 /* slots 0 (D1), 1 (D0) */
+#endif
     virtual int DoSetFile(char *file, int a, int b);  /* slot 2 */
     virtual void UpdateVerts();                       /* slot 3 */
     virtual void Virtual10(Matrix4x3 &mat);           /* slot 4 */
