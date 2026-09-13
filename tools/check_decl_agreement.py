@@ -19,14 +19,41 @@ owns stays green: the bytes are right in all three objects, the link resolves by
 
 Measured on this tree the day the gate was written, `__cxa_vec_ctor` carried 52 extern
 declarations: 47 returning `void`, 3 returning `int` and 2 returning `void *`, against a
-definition that returns `void`. That is not a curiosity. A declaration is the only
-surviving statement about what the original C++ said, the host port compiles these same
-files with a compiler that DOES check them, and a wrong return type is the shape that
-silently smashes a caller's stack the first time someone reuses the declaration for real
-work.
+definition that returns `void`. At most one of those four spellings can be right, so it
+is a real defect however it is settled -- and settling it is a person's job, not this
+tool's.
 
-`.claude/skills/decomp-match-review` names this "the highest-value unbuilt item, and the
-one the byte gate can never do". This is that gate.
+WHAT A FINDING IS EVIDENCE OF
+-----------------------------
+BOTH SIDES ARE RECONSTRUCTIONS. Nothing in this repo is original source. A declaration
+and the definition it names are two independent guesses at one interface, written at
+different times by different hands, and a finding says they CONTRADICT each other. It
+does not say which one is wrong, and the declaration is not privileged: a definition
+recovered from one function's disassembly can carry a guessed parameter type just as
+easily.
+
+Reconstruction is constrained, though, and those constraints are what settle a finding:
+the instructions the compiler actually emitted for the definition, what every call site
+passes and does with the result, the class names and hierarchy the ROM's RTTI records,
+and the argument list a mangled `_Z` name spells out. Read them before editing either
+side. Making the two agree on the WRONG type is a regression this gate cannot see.
+
+THE BYTE GATES DO COMPILE DECLARATIONS. `mwccarm` type-checks every declaration in a
+translation unit against that file's own uses, and a byte-identical object is proof
+about the codegen they produced. What no byte gate does is compare ONE translation
+unit's declaration against ANOTHER's definition: the link resolves by NAME, the ROM
+records no types, and `check_references.py` only asks whether the name exists. That
+cross-TU contract is the gap this fills, and it is the whole of it.
+`.claude/skills/decomp-match-review` calls it "the highest-value unbuilt item"; read
+"the one the byte gate can never do" as being about that comparison, not about whether
+a compiler ever sees a declaration.
+
+WHY IT IS WORTH FIXING. The host port compiles these same files with a compiler that
+DOES check across the tree, where `signature-mismatch` is the largest non-trivial
+failure bucket. The runtime cost varies and is not always dramatic: `int` against `void`
+on ARM usually means the caller reads a dead r0, while a wrong arity, a mismatched
+pointer or a struct return can genuinely put caller and callee on different frame
+layouts. "Silently smashes the caller's stack" is the worst case, not the rule.
 
 WHAT IT COMPARES
 ----------------
@@ -36,12 +63,31 @@ merged translation unit) or the flat identifier the definition itself declares. 
 a hand-spelled `_ZN9ModelAnim7AdvanceEv` extern and the file that defines it line up here
 even though neither side is C++ the compiler would recognise as the same entity.
 
-A DEFINITION IS A FUNCTION BODY OR AN INITIALISED OBJECT. `int target = 0;` defines the
+A DEFINITION IS A FUNCTION BODY OR A FILE-SCOPE OBJECT. `int target = 0;` defines the
 linker symbol `target`, of kind data, and a file declaring `extern int target(void);` is
 contradicting it -- which is a `kind` finding and not a small one, since the caller will
-branch to a number. `static` is not: internal linkage is not the symbol anybody else
-declares. Nor is an out-of-line member with no `@symbol` line, whose mangled name is not
-recoverable from the text.
+branch to a number. So does `int target;` with no initialiser: that is C's tentative
+definition and C++'s definition outright, and every declarator in a list defines its own
+symbol, so `int prefix = 0, target = 0;` defines both. `extern int target;` does not --
+the keyword without an initialiser is the one spelling that only declares.
+
+FOUR THINGS ARE NOT THE GLOBAL SYMBOL, and claiming them is worse than missing them
+because it makes this tool report a FALSE finding against an honest declaration:
+
+  static                `static int t = 0;` -- internal linkage is not what anyone
+                        else's `extern` names.
+  const, in C++ only    `const int t = 0;` at namespace scope has internal linkage
+                        unless it also says `extern`. C has no such rule, so a `.c`
+                        keeps the definition. Top-level const only: `const char *t`
+                        is a mutable pointer and still defines `t`.
+  namespace scope       `namespace P { int t = 0; }` defines `_ZN1P1tE`. Language
+                        linkage beats scope, so `namespace P { extern "C" int t; }`
+                        -- which is how this tree gives one callee two views -- does
+                        define the flat name.
+  out-of-line members   `daStarGate_c::State daStarGate_c::ST_WAIT = {...}`.
+
+The last two are recoverable when the file carries a `// @symbol <name>` line, and are
+claimed under that name when it does.
 
 For every symbol with at least one `extern` declaration, this compares each declaration
 against the reference spelling:
@@ -204,10 +250,17 @@ def scrub(text):
 
     A lexer rather than a regex because this tree writes URLs, `//` inside string
     literals and path-shaped constants constantly, and a comment regex eats them.
+
+    A leading BOM becomes a space rather than staying glued to the first token. One
+    file in this tree carries one (`src/func_ov065_021183c8.c`), and `﻿typedef`
+    does not match `^typedef\\b`: the typedef that opens that file read as a
+    declaration of a symbol called `u16`.
     """
     out = []
     marks = []
     i = 0
+    if text.startswith("﻿"):
+        text = " " + text[1:]
     size = len(text)
     while i < size:
         ch = text[i]
@@ -597,7 +650,9 @@ def _brace_kind(head):
     `initialiser` is `int table[] = { ... };`. The block belongs to the initialiser and
     is skipped the same way, but the head in front of it DEFINES a data symbol, so it
     is handed back rather than dropped: a file declaring `extern int table(void)` is
-    contradicting that definition and nothing else in this tool would see it.
+    contradicting that definition and nothing else in this tool would see it. The
+    declarator list AFTER the block is handed back with it, because `int a[] = { 1 },
+    target = 0;` defines `target` too and the walker used to eat it with the braces.
     """
     tail = " ".join(head.split())
     if re.search(r'extern\s+"C(\+\+)?"\s*$', tail):
@@ -615,10 +670,13 @@ def _brace_kind(head):
 
 
 def top_level_units(code, default_linkage):
-    """Yield (start, text, terminator, linkage, in_block) per top-level statement.
+    """Yield (start, text, term, linkage, in_block, in_ns) per top-level statement.
 
     `in_block` says the statement sits inside an explicit `extern "C" { ... }`, where
-    a declaration does not have to repeat the `extern` keyword to be one.
+    a declaration does not have to repeat the `extern` keyword to be one. `in_ns` says
+    it sits inside a `namespace { ... }`. The two are not exclusive and the CALLER
+    decides: language linkage beats scope, so a namespaced entity is mangled only when
+    its effective linkage is still C++.
 
     Function bodies, aggregates and initialisers are skipped whole: their contents are
     not `extern` declarations of anything, and walking into them is how a naive scanner
@@ -632,13 +690,14 @@ def top_level_units(code, default_linkage):
     kinds = []
     while i < n:
         block = "linkage" in kinds
+        in_ns = "scope" in kinds
         ch = code[i]
         if ch in "([":
             paren += 1
         elif ch in ")]":
             paren -= 1
         elif paren <= 0 and ch == ";":
-            yield start, code[start:i], ";", linkage[-1], block
+            yield start, code[start:i], ";", linkage[-1], block, in_ns
             start = i + 1
         elif paren <= 0 and ch == "{":
             head = code[start:i]
@@ -654,9 +713,7 @@ def top_level_units(code, default_linkage):
                 start = i + 1
             else:
                 if kind == "body":
-                    yield start, head, "{", linkage[-1], block
-                elif kind == "initialiser":
-                    yield start, head, "=", linkage[-1], block
+                    yield start, head, "{", linkage[-1], block, in_ns
                 depth = 0
                 while i < n:
                     if code[i] == "{":
@@ -667,6 +724,7 @@ def top_level_units(code, default_linkage):
                             i += 1
                             break
                     i += 1
+                after = i
                 if kind in ("aggregate", "initialiser"):
                     # `} Vector3;` -- the trailing declarator list names the TYPE,
                     # not an extern. Consume it with the block.
@@ -682,6 +740,15 @@ def top_level_units(code, default_linkage):
                         elif code[i] in "{}" and tail_paren <= 0:
                             break
                         i += 1
+                if kind == "initialiser":
+                    # Not the type's declarator list but the OBJECT's: in
+                    # `int a[] = { 1 }, target = 0;` everything after the block
+                    # defines a symbol of its own, and consuming it with the braces
+                    # lost every declarator but the first. Nothing downstream reads
+                    # an initialiser's VALUE, so a `0` stands in for the block and
+                    # the statement is handed over whole.
+                    tail = code[after:i].rstrip().rstrip(";")
+                    yield start, head + "0" + tail, ";", linkage[-1], block, in_ns
                 start = i
                 continue
         elif paren <= 0 and ch == "}":
@@ -998,8 +1065,8 @@ def parse_file(rel, text, aliases):
             file_types |= _typedef_words(stmt)
     decls, defs = [], []
     unparsed = 0
-    for start, chunk, term, linkage, in_block in top_level_units(code,
-                                                                default_linkage):
+    for start, chunk, term, linkage, in_block, in_ns in top_level_units(
+            code, default_linkage):
         body = " ".join(chunk.split())
         if not body:
             continue
@@ -1021,6 +1088,14 @@ def parse_file(rel, text, aliases):
         # in it.
         decl_start = start + (len(chunk) - len(chunk.lstrip()))
         line = line_of(newlines, decl_start)
+        # LANGUAGE LINKAGE BEATS SCOPE. `namespace N { void f() {} }` defines
+        # `_ZN1N1fEv` and not `f`, but `namespace fndef_e4 { extern "C" int
+        # func_ov029_021116e4(...) {...} }` -- which is how this tree gives one callee
+        # two views without renaming it -- defines the FLAT name, `extern "C"` on the
+        # declaration or on a block inside the namespace either way. Reading the
+        # namespace alone drops those two definitions and the 3 live findings they
+        # anchor in `include/decl_common.h`.
+        mangled_scope = in_ns and linkage != "C"
 
         if term == "{":
             # A definition. Its identity is the `@symbol` line above it when the file
@@ -1035,8 +1110,9 @@ def parse_file(rel, text, aliases):
                 continue
             marked = [s for idx, s in marks if start <= idx < decl_start]
             symbol = marked[-1] if marked else name
-            if "::" in rest and not marked:
-                # An out-of-line member with no `@symbol` line: the linker name is not
+            if ("::" in rest or mangled_scope) and not marked:
+                # An out-of-line member, or a function inside `namespace N { ... }`,
+                # with no `@symbol` line: the linker name is mangled and not
                 # recoverable from the text, so claim nothing.
                 continue
             defs.append(Record(symbol, rel, line, ret, params, True,
@@ -1044,79 +1120,140 @@ def parse_file(rel, text, aliases):
                                _raw_types(rest, name) | file_types))
             continue
 
-        # An `=` at DEPTH ZERO is an initialiser. One inside the parentheses is a
-        # default argument -- `extern void f(int a = 0);` is still a declaration, and
-        # reading it as a definition would drop it from the comparison entirely.
-        halves = split_top(rest, seps=("=",))
-        has_init = term == "=" or len(halves) > 1
-        if len(halves) > 1:
-            rest = halves[0].strip()
         if saw_static and not saw_extern:
             # `static` is internal linkage. Whatever it defines is not the symbol any
             # other file's `extern` names, so it stays out of both lists.
             continue
-        if has_init:
-            # An initialised file-scope object is a DEFINITION of a DATA symbol --
-            # `int target = 0;` defines `target`, and a file declaring
-            # `extern int target(void);` contradicts it. Throwing these away (which is
-            # what this branch used to do) let that contradiction pass both the full
-            # scan and `--changed`. An `extern` keyword does not change it: a
-            # declaration WITH an initialiser is a definition, which is how this tree
-            # writes `extern "C" DaBarSpawnInfo g_profile_BAR = { ... };`.
-            marked = [s for idx, s in marks if start <= idx < decl_start]
-            if "::" in rest and not marked:
-                # An out-of-line member with no `@symbol` line -- `daStarGate_c::State
-                # daStarGate_c::ST_WAIT = {...}`. The linker name is mangled and not
-                # recoverable from the text, so claim nothing, exactly as the function
-                # branch above does.
+        marked = [s for idx, s in marks if start <= idx < decl_start]
+        pieces = _declarator_pieces(rest)
+        source = rel.endswith(SOURCE_SUFFIXES)
+        for piece, has_init in pieces:
+            # Which list this declarator would have reached before the initialiser was
+            # separated out, so the unparsed tally counts the same declarators it did.
+            reaches_decls = not has_init and (saw_extern or in_block or not source)
+            parsed = parse_declarator(piece, aliases, cxx)
+            if parsed is None:
+                if reaches_decls and not IDENT.fullmatch(piece.strip()):
+                    unparsed += 1
                 continue
-            pieces = _declarator_pieces(rest)
-            for piece in pieces:
-                parsed = parse_declarator(piece, aliases, cxx)
-                if parsed is None:
+            name, ret, params, is_fn, _member = parsed
+            if has_init and is_fn:
+                # A parenthesised head with an initialiser is a constructor call or a
+                # parse this tool should not guess at. Claim nothing.
+                continue
+            # A DEFINITION is an initialised object -- `int target = 0;` defines the
+            # linker symbol `target`, and a file declaring `extern int target(void);`
+            # contradicts it -- or an object at file scope with no `extern` keyword.
+            # `int target;` is C's tentative definition and C++'s definition outright;
+            # dropping it (which is what this branch used to do) let the same
+            # contradiction pass both the full scan and `--changed`. An `extern`
+            # keyword does not un-define an INITIALISED object, which is how this tree
+            # writes `extern "C" DaBarSpawnInfo g_profile_BAR = { ... };`.
+            defines = has_init or (not is_fn and not saw_extern and source)
+            if defines:
+                if cxx and not saw_extern and _const_object(piece, name):
+                    # C++ only: a namespace-scope `const` object has INTERNAL linkage
+                    # unless it is also `extern`. Like `static`, it is not the symbol
+                    # any other file's `extern` names. C has no such rule, so a `.c`
+                    # (and a `.h`, whose includer decides) keeps the definition.
                     continue
-                name, ret, params, is_fn, _member = parsed
-                if is_fn:
-                    # A parenthesised head with an initialiser is a constructor call
-                    # or a parse this tool should not guess at. Claim nothing.
+                if ("::" in piece or mangled_scope) and not marked:
+                    # An out-of-line member -- `daStarGate_c::State
+                    # daStarGate_c::ST_WAIT = {...}` -- or an object inside
+                    # `namespace N { ... }`. The linker name is mangled and not
+                    # recoverable from the text, so claim nothing, exactly as the
+                    # function branch above does.
                     continue
                 symbol = marked[-1] if (marked and len(pieces) == 1) else name
                 defs.append(Record(symbol, rel, line, ret, params, False,
                                    linkage, True, False,
                                    _raw_types(piece, name) | file_types))
-            continue
-        if not saw_extern:
-            # Inside `extern "C" { ... }` a declaration need not repeat `extern`.
-            if not in_block and rel.endswith(SOURCE_SUFFIXES):
                 continue
-        for piece in _declarator_pieces(rest):
-            parsed = parse_declarator(piece, aliases, cxx)
-            if parsed is None:
-                if not IDENT.fullmatch(piece.strip()):
-                    unparsed += 1
+            if not reaches_decls:
+                # A bare function declaration in a source file outside an
+                # `extern "C" { ... }` block. Inside one a declaration need not repeat
+                # the `extern` keyword to be one.
                 continue
-            name, ret, params, is_fn, _member = parsed
             decls.append(Record(name, rel, line, ret, params, is_fn, linkage,
                                 False, False, _raw_types(piece, name) | file_types))
     return decls, defs, unparsed
 
 
+CONST_WORD = re.compile(r"\bconst\b")
+
+
+def _const_object(piece, name):
+    """Is the OBJECT this declarator names const-qualified at the top level?
+
+    `const int t` and `int *const t` are const objects; `const int *t` is a mutable
+    pointer to a const int and is not. The distinction decides linkage in C++, so
+    reading it off the leading keyword alone would take 1,300-odd `const char *`
+    tables out of the comparison for no reason.
+    """
+    spans = list(re.finditer(r"\b%s\b" % re.escape(name), piece)) if name else []
+    head = piece[:spans[-1].start()] if spans else piece
+    cut = max(head.rfind("*"), head.rfind("&"))
+    return CONST_WORD.search(head[cut + 1:]) is not None
+
+
+def _split_initialiser(text):
+    """(the declarator, whether it carries an `=` initialiser at depth zero).
+
+    An `=` inside the parentheses is a default argument -- `extern void f(int a = 0);`
+    is still a declaration, and reading it as a definition would drop it from the
+    comparison entirely. `==`, `!=`, `<=` and `>=` are comparisons, not initialisers.
+    """
+    depth = 0
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if ch in "([<":
+            depth += 1
+        elif ch in ")]>":
+            depth -= 1
+        elif ch == "=" and depth <= 0:
+            if text[i + 1:i + 2] == "=":
+                i += 2
+                continue
+            if i and text[i - 1] in "=!<>":
+                i += 1
+                continue
+            return text[:i], True
+        i += 1
+    return text, False
+
+
 def _declarator_pieces(rest):
-    """`int a, b` is two declarators sharing a base type; `f(int, int)` is one."""
-    parts = split_top(rest)
+    """[(declarator, has_initialiser)] for one statement's declarator list.
+
+    `int a, b` is two declarators sharing a base type; `f(int, int)` is one. Each
+    declarator carries ITS OWN initialiser: `int prefix = 0, target = 0;` defines
+    `prefix` AND `target`. Splitting the whole statement at its first `=` -- which is
+    what the caller used to do before calling this -- kept `prefix`, threw the rest of
+    the list away, and let a file declaring `extern int target(void);` contradict a
+    definition the tool had never recorded.
+    """
+    def whole():
+        head, init = _split_initialiser(rest)
+        return [(head.strip(), init)]
+
+    parts = [_split_initialiser(p) for p in split_top(rest)]
     if len(parts) == 1:
-        return [rest]
-    base = parts[0].strip()
+        head, init = parts[0]
+        return [(head.strip(), init)]
+    base, base_init = parts[0]
+    base = base.strip()
     m = re.match(r"^(.*?)([A-Za-z_][A-Za-z0-9_]*\s*(\[[^\[\]]*\])*)$", base)
     if not m or not m.group(1).strip():
-        return [rest]
+        return whole()
     prefix = m.group(1).strip().rstrip("*&")
-    out = [base]
-    for extra in parts[1:]:
+    out = [(base, base_init)]
+    for extra, extra_init in parts[1:]:
         extra = extra.strip()
         if not extra or "(" in extra:
-            return [rest]
-        out.append("%s %s" % (prefix, extra))
+            return whole()
+        out.append(("%s %s" % (prefix, extra), extra_init))
     return out
 
 
@@ -1404,9 +1541,17 @@ def _paths_of(rows):
     much as the new one, because the symbols it used to define are the ones whose
     declarations elsewhere have just been orphaned or retyped.
 
-    A pure deletion (`D`) is deliberately not folded in. A declaration whose definition
-    vanished is a name that no longer resolves, which is `check_references.py`'s
-    question, not this one's.
+    A deleted TYPE or CONFIGURATION input (`D`) is folded in too, and read out of the
+    base commit. Deleting `include/types.h` retypes every declaration that spelled one
+    of its typedefs, in files the diff never touched -- the full scan rejects them and
+    `--changed` used to exit 0 without scanning at all, because a `D` row left it with
+    no source path to work from. `check_references.py` does NOT cover this: its
+    question is whether a NAME still resolves, and every name here still does. What
+    changed is what the surviving declarations MEAN.
+
+    A deleted SOURCE is still not folded in. A declaration whose definition vanished
+    is a name that no longer resolves, which is `check_references.py`'s question and
+    not this one's.
     """
     out = set()
     for status, paths in rows:
@@ -1415,7 +1560,23 @@ def _paths_of(rows):
             out.add(paths[0])
         elif code in ("R", "C"):
             out.update(paths[:2])
+        elif code == "D" and _is_type_or_config_input(paths[0]):
+            out.add(paths[0])
     return out
+
+
+def _is_type_or_config_input(path):
+    """Is this path read for what it DEFINES rather than for what it declares?
+
+    A header carries the typedefs, macros and tags that every declaration elsewhere
+    resolves through, and `config/**/symbols.txt` is where the linkage check reads
+    whether a name is mangled. Both stay in scope when they are deleted, because the
+    identities they used to supply are exactly what the base blob still has.
+    """
+    if path.endswith(HEADER_SUFFIXES):
+        return True
+    return (path.startswith("config/")
+            and pathlib.PurePosixPath(path).name == "symbols.txt")
 
 
 def changed_paths(base, repo=REPO, head="HEAD"):
@@ -1729,10 +1890,14 @@ def main(argv=None):
     print("\nFAIL: %d declaration(s) contradict the symbol's definition:\n" % len(new))
     for f in sorted(new, key=lambda x: (x["symbol"], x["file"], x["line"])):
         print_finding(f)
-    print("\nA declaration is the only surviving statement about what the original C++")
-    print("said, and nothing in the byte gate reads it: the link resolves by NAME. Fix")
-    print("the declaration to agree with the definition -- and REBUILD, because a")
-    print("declaration change can change instruction selection at the call site.")
+    print("\nEach of these is two RECONSTRUCTED spellings of one interface that")
+    print("contradict each other. EITHER SIDE CAN BE THE WRONG ONE -- settle it against")
+    print("the definition's own codegen, the call sites, the ROM's RTTI and the argument")
+    print("list of any mangled name, not by assuming the definition wins.")
+    print("The byte gates DO compile declarations; what none of them does is compare one")
+    print("translation unit's declaration with another's definition, because the link")
+    print("resolves by NAME. REBUILD after the edit: changing a declaration can change")
+    print("instruction selection at the call site.")
     print("If the disagreement is deliberate and byte-proved, bank it with --update.")
     return 1
 

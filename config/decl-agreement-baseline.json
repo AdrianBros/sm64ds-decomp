@@ -9565,8 +9565,9 @@
    "src/func_02043fdc.cpp": ["return:Node *"]
   },
   "data_020a4b6c": {
-   "src/_ZN7fBase_c21AfterCleanupResourcesEj.cpp": ["return:char"],
-   "src/_ZN7fBase_cC2Ev.cpp": ["return:fBase_c::SceneNode"]
+   "include/decl_common.h": ["return:int"],
+   "src/_ZN7fBase_cC2Ev.cpp": ["return:fBase_c::SceneNode"],
+   "src/func_02044120.c": ["return:int"]
   },
   "data_020a4b78": {
    "src/_ZN7fBase_c18AfterInitResourcesEj.cpp": ["return:int []"]
@@ -9579,7 +9580,8 @@
    "src/_ZN7fBase_c18AfterInitResourcesEj.cpp": ["return:int []"]
   },
   "data_020a4ba8": {
-   "src/_ZN7fBase_c21AfterCleanupResourcesEj.cpp": ["return:char"]
+   "src/func_02043880.c": ["return:int"],
+   "src/func_02044120.c": ["return:int"]
   },
   "data_020a4bb8": {
    "src/_ZN7fBase_cC2Ev.cpp": ["return:fBaseActorInfo * *"],
@@ -14059,7 +14061,7 @@
    "src/func_ov100_02144cf8.c": ["return:char []"]
   },
   "data_ov100_02148948": {
-   "src/game/actors/d_a_star_gate.cpp": ["return:StarGateVector3"]
+   "include/decl_common.h": ["return:Vector3"]
   },
   "data_ov100_021489cc": {
    "src/__sinit_ov100_02147bc0.c": ["return:char []"],

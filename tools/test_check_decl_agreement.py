@@ -16,19 +16,33 @@ The five fixtures the gate was commissioned for, one test each:
   * a rename where the definition moved, leaving declarations naming a symbol that is
     no longer defined anywhere
 
-The four false-pass paths reported on PR #2471 get one class each at the bottom of this
-file. They are `--changed` cases, so they run on a git repo past the tool's scan floors
-(2,100 sources, 6,303 declarations) rather than a two-file toy, which the tool refuses to
+The false-pass paths reported on PR #2471 get one class each at the bottom of this file.
+They are `--changed` cases, so they run on a git repo past the tool's scan floors (2,100
+sources, 6,300-odd declarations) rather than a two-file toy, which the tool refuses to
 report a pass on at all -- and each one is written so it FAILS on the code as it was
-before its fix:
+before its fix. The first review reported four:
 
   * a shared typedef changed, invalidating a consumer the diff never touched
   * a `config/**/symbols.txt` row changed with no source path in the diff
   * a rename whose definition changed signature in the same commit
   * an `extern int target(void)` against an actual `int target = 0` definition
 
-`BigTreeHarnessTests.test_a_wrong_return_type_fails_both_modes` is their control: it
-fails both modes before those four fixes and after them, so a green run of the four is
+and the re-review four more:
+
+  * `int prefix = 0, target = 0;` -- everything after the first `=` was thrown away
+  * `int target;` -- an uninitialised external object was dropped from both lists
+  * `const int t = 0;` in C++ and `namespace P { int t = 0; }` wrongly claiming the
+    GLOBAL name `t`, which fabricates a finding rather than hiding one
+  * a deleted `include/types.h`, which `_paths_of` discarded with every other `D` row
+
+Seventeen assertions across those last four classes FAIL on the parser as it was. The
+controls sitting beside them -- an `extern` object, a default argument, a pointer to
+const, `extern "C"` inside a namespace, an `@symbol`-marked namespace definition, a
+deleted SOURCE staying out of scope -- pass in BOTH states, which is what says the fixes
+narrowed the right thing instead of switching a side off.
+
+`BigTreeHarnessTests.test_a_wrong_return_type_fails_both_modes` is the overall control:
+it fails both modes before every one of these fixes and after them, so a green run is
 not a harness that stopped looking.
 
 Self-running: `python tools/test_check_decl_agreement.py`, or via unittest/pytest.
@@ -762,6 +776,24 @@ class BigRepo(object):
         self.write("src/ren_user.c", "extern void ren_target(int a);\n")
         # Path 4 (:854), the initialised data definition.
         self.write("src/data_def.c", "int data_target = 0;\n")
+        # Round two, item 1 (:1050): a declarator list. Only the FIRST declarator
+        # survived splitting the whole statement at its first `=`.
+        self.write("src/multi_def.c", "int multi_prefix = 0, multi_target = 0;\n")
+        # The same loss through the walker: everything after a `{ ... }` initialiser
+        # block used to be eaten with the braces.
+        self.write("src/braced_def.c",
+                   "int braced_prefix[] = { 1, 2 }, braced_target = 0;\n")
+        # Round two, item 1 (:1088): an uninitialised external object. C's tentative
+        # definition still defines the linker symbol.
+        self.write("src/bare_def.c", "int bare_target;\n")
+        # Round two, item 1, ownership: a declaration of a name NOTHING in the tree
+        # defines. It agrees with itself and is silent -- unless an internal-linkage
+        # or namespace-scoped object wrongly claims the global name, which turns it
+        # into a false POSITIVE rather than a false pass.
+        self.write("src/own_user.c", "extern void own_target(int a);\n")
+        # An unrelated non-source file, so a deletion-only diff is still a diff and
+        # `--changed` reaches the scan instead of erroring on an empty one.
+        self.write("README.md", "fixture\n")
         # The positive control: a definition whose declaration a test will contradict.
         self.write("src/ctl_def.c", "void ctl_target(void) { }\n")
         rows = "".join("cfg_other_%d kind:function(arm,size=0x4) addr:0x0200%04x\n"
@@ -1085,6 +1117,332 @@ class DataDefinitionTests(unittest.TestCase):
         repo.write("src/data_static.c", "static int data_static_target = 0;\n")
         _files, _decls, defs, _u = CDA.collect(repo.root)
         self.assertEqual([d for d in defs if d.symbol == "data_static_target"], [])
+
+
+# ---------------------------- the four defects reported on the second review of #2471
+
+class LaterDeclaratorTests(unittest.TestCase):
+    """Item 1, `:1050`: a declarator list is not one declarator.
+
+    `int multi_prefix = 0, multi_target = 0;` defines two data symbols. The parser
+    split the WHOLE statement at its first `=` before looking at the declarators, so
+    it recorded `multi_prefix` and never saw `multi_target` -- and a file declaring
+    `extern int multi_target(void);` contradicted a definition the tool had thrown
+    away, in both the full scan and `--changed`.
+
+    Each of these FAILS on the parser as it was and passes after it.
+    """
+
+    def _mutate(self, repo):
+        repo.write("src/multi_user.c", "extern int multi_target(void);\n")
+
+    def test_the_full_scan_reports_the_second_declarator(self):
+        repo = BigRepo.shared()
+        repo.reset()
+        self._mutate(repo)
+        rc, out = repo.run_main(["--list"])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("src/multi_user.c", out)
+        self.assertIn("kind", out)
+
+    def test_the_changed_scan_reports_it_too(self):
+        repo = BigRepo.shared()
+        repo.reset()
+        self._mutate(repo)
+        rc, out = repo.run_main(["--changed", "HEAD", "--list"])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("src/multi_user.c", out)
+
+    def test_every_declarator_in_the_list_is_a_definition(self):
+        repo = BigRepo.shared()
+        repo.reset()
+        _files, _decls, defs, _u = CDA.collect(repo.root)
+        got = {d.symbol: d for d in defs
+               if d.symbol in ("multi_prefix", "multi_target")}
+        self.assertEqual(sorted(got), ["multi_prefix", "multi_target"])
+        self.assertEqual(got["multi_target"].ret, "int")
+        self.assertFalse(got["multi_target"].is_function)
+
+    def test_a_declarator_after_a_brace_initialiser_survives_the_block(self):
+        """`int a[] = { 1, 2 }, target = 0;` -- the walker used to eat `target`."""
+        repo = BigRepo.shared()
+        repo.reset()
+        _files, _decls, defs, _u = CDA.collect(repo.root)
+        got = sorted(d.symbol for d in defs
+                     if d.symbol in ("braced_prefix", "braced_target"))
+        self.assertEqual(got, ["braced_prefix", "braced_target"])
+
+    def test_a_default_argument_is_still_not_an_initialiser(self):
+        """The control for this fix: `= 0` inside the parentheses claims nothing."""
+        decls, defs, _u = CDA.parse_file(
+            "src/x.cpp", "//cpp\nextern void dflt(int a = 0);\n", {})
+        self.assertEqual([d.symbol for d in defs], [])
+        self.assertEqual([(d.symbol, d.is_function) for d in decls],
+                         [("dflt", True)])
+
+
+class UninitialisedDefinitionTests(unittest.TestCase):
+    """Item 1, `:1088`: an uninitialised external object is still a definition.
+
+    `int bare_target;` at file scope is C's tentative definition and C++'s definition
+    outright: it defines the linker symbol. The parser dropped it -- it reached
+    neither list -- so `extern int bare_target(void);` passed both modes exactly as
+    the initialised case used to.
+
+    The first three FAIL on the parser as it was.
+    """
+
+    def _mutate(self, repo):
+        repo.write("src/bare_user.c", "extern int bare_target(void);\n")
+
+    def test_the_full_scan_reports_the_kind_disagreement(self):
+        repo = BigRepo.shared()
+        repo.reset()
+        self._mutate(repo)
+        rc, out = repo.run_main(["--list"])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("src/bare_user.c", out)
+        self.assertIn("kind", out)
+
+    def test_the_changed_scan_reports_it_too(self):
+        repo = BigRepo.shared()
+        repo.reset()
+        self._mutate(repo)
+        rc, out = repo.run_main(["--changed", "HEAD", "--list"])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("src/bare_user.c", out)
+
+    def test_the_definition_carries_the_declared_type(self):
+        repo = BigRepo.shared()
+        repo.reset()
+        _files, _decls, defs, _u = CDA.collect(repo.root)
+        found = [d for d in defs if d.symbol == "bare_target"]
+        self.assertEqual(len(found), 1)
+        self.assertFalse(found[0].is_function)
+        self.assertEqual(found[0].ret, "int")
+
+    def test_an_extern_object_with_no_initialiser_is_still_a_DECLARATION(self):
+        """The control. `extern int t;` declares; only the keyword-free form defines."""
+        decls, defs, _u = CDA.parse_file("src/x.c", "extern int t;\n", {})
+        self.assertEqual([d.symbol for d in defs], [])
+        self.assertEqual([d.symbol for d in decls], ["t"])
+
+    def test_a_bare_function_declaration_still_defines_nothing(self):
+        """A prototype has no body. Only OBJECTS define without a keyword."""
+        decls, defs, _u = CDA.parse_file("src/x.c", "void f(int a);\n", {})
+        self.assertEqual([d.symbol for d in defs], [])
+        self.assertEqual([d.symbol for d in decls], [])
+
+    def test_a_static_uninitialised_object_is_not_a_definition(self):
+        decls, defs, _u = CDA.parse_file("src/x.c", "static int t;\n", {})
+        self.assertEqual([d.symbol for d in defs], [])
+        self.assertEqual([d.symbol for d in decls], [])
+
+
+class DefinitionOwnershipTests(unittest.TestCase):
+    """Item 1, ownership: internal-linkage and mangled-scope objects are not the global.
+
+    `const int target = 0;` in a C++ translation unit and
+    `namespace Private { int target = 0; }` both used to be recorded as a global
+    definition named `target`. Neither is: the first has internal linkage, the second
+    is `_ZN7Private6targetE`. Claiming them is worse than missing them -- it makes the
+    gate report a FALSE finding against an honest declaration elsewhere.
+
+    Every `assertEqual(..., [])` here FAILS on the parser as it was; the four controls
+    around them pass in both states, which is what says the rule did not just switch
+    the definition side off.
+    """
+
+    def _defs(self, rel, code):
+        _d, defs, _u = CDA.parse_file(rel, code, {})
+        return sorted(d.symbol for d in defs)
+
+    # ------------------------------------------------------------- internal linkage
+
+    def test_a_const_object_in_a_cxx_TU_is_not_the_global_symbol(self):
+        self.assertEqual(self._defs("src/x.cpp", "//cpp\nconst int target = 0;\n"), [])
+
+    def test_an_extern_const_object_in_a_cxx_TU_still_is(self):
+        """`extern` restores external linkage. The control for the rule above."""
+        self.assertEqual(
+            self._defs("src/x.cpp", "//cpp\nextern const int target = 0;\n"),
+            ["target"])
+
+    def test_a_const_object_in_a_C_TU_still_is(self):
+        """C has no such rule: file-scope `const` is external. Control."""
+        self.assertEqual(self._defs("src/x.c", "const int target = 0;\n"), ["target"])
+
+    def test_a_pointer_TO_const_is_not_a_const_object(self):
+        """`const char *t` is a mutable pointer. Control: this tree has ~1,300."""
+        self.assertEqual(self._defs("src/x.cpp", '//cpp\nconst char *target = 0;\n'),
+                         ["target"])
+
+    def test_a_const_pointer_IS_a_const_object(self):
+        self.assertEqual(
+            self._defs("src/x.cpp", "//cpp\nchar *const target = 0;\n"), [])
+
+    # ---------------------------------------------------------------- mangled scope
+
+    def test_a_namespace_scoped_object_is_not_the_global_symbol(self):
+        self.assertEqual(
+            self._defs("src/x.cpp", "//cpp\nnamespace P { int target = 0; }\n"), [])
+
+    def test_a_namespace_scoped_function_is_not_the_global_symbol_either(self):
+        self.assertEqual(
+            self._defs("src/x.cpp", "//cpp\nnamespace P { void target(void) { } }\n"),
+            [])
+
+    def test_extern_c_INSIDE_a_namespace_still_defines_the_flat_name(self):
+        """Language linkage beats scope, and this tree writes exactly this shape."""
+        self.assertEqual(
+            self._defs("src/x.cpp",
+                       '//cpp\nnamespace P { extern "C" int target(void) { } }\n'),
+            ["target"])
+
+    def test_an_extern_c_BLOCK_inside_a_namespace_does_too(self):
+        self.assertEqual(
+            self._defs("src/x.cpp",
+                       '//cpp\nnamespace P { extern "C" { int target = 0; } }\n'),
+            ["target"])
+
+    def test_a_marked_namespace_definition_keeps_its_at_symbol_name(self):
+        """`// @symbol` is how this tree spells a name it cannot recover. Control."""
+        self.assertEqual(
+            self._defs("src/x.cpp",
+                       "//cpp\nnamespace P {\n// @symbol _ZN1P6targetEv\n"
+                       "void target(void) { }\n}\n"),
+            ["_ZN1P6targetEv"])
+
+    # -------------------------------------------------- and what that buys, end to end
+
+    def test_a_namespace_object_does_not_fabricate_a_finding_against_a_real_extern(self):
+        """The false POSITIVE the ownership bug makes. Fails before the fix, rc 1."""
+        repo = BigRepo.shared()
+        repo.reset()
+        repo.write("src/own_ns.cpp", "//cpp\nnamespace Private { int own_target = 0; }\n")
+        rc, out = repo.run_main(["--list"])
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("own_target", out)
+
+    def test_a_const_object_does_not_either(self):
+        repo = BigRepo.shared()
+        repo.reset()
+        repo.write("src/own_const.cpp", "//cpp\nconst int own_target = 0;\n")
+        rc, out = repo.run_main(["--list"])
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("own_target", out)
+
+
+class DeletedTypeInputTests(unittest.TestCase):
+    """Item 2, `:1407`: `_paths_of` threw away every `D` row.
+
+    Deleting `include/types.h` retypes `extern void tdef_target(tdef_handle);` in a
+    file the diff never touched: `tdef_handle` stops resolving to `unsigned int` and
+    the declaration stops agreeing with `void tdef_target(unsigned int)`. The full
+    scan says so. `--changed` had no source path left in the diff at all, so it
+    printed "nothing for this gate to check" and exited 0.
+
+    `check_references.py` does not cover this. Every name here still resolves; what
+    changed is what the surviving declarations MEAN.
+    """
+
+    def _mutate(self, repo):
+        (repo.root / "include" / "types.h").unlink()
+        repo.write("README.md", "fixture, touched\n")
+
+    def test_the_full_scan_rejects_the_orphaned_consumer(self):
+        """The premise. True before the fix and after it -- the full scan never
+        looked at git."""
+        repo = BigRepo.shared()
+        repo.reset()
+        self._mutate(repo)
+        rc, out = repo.run_main(["--list"])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("src/tdef_user.c", out)
+
+    def test_the_changed_scan_does_not_exit_clean_on_a_deleted_type_header(self):
+        """FAILS before the fix: rc 0, "nothing for this gate to check"."""
+        repo = BigRepo.shared()
+        repo.reset()
+        self._mutate(repo)
+        rc, out = repo.run_main(["--changed", "HEAD", "--list"])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("src/tdef_user.c", out)
+
+    def test_the_deleted_header_is_in_the_work_list(self):
+        repo = BigRepo.shared()
+        repo.reset()
+        self._mutate(repo)
+        total, err = CDA.changed_paths("HEAD", repo.root)
+        self.assertIsNone(err)
+        self.assertIn("include/types.h", total)
+
+    def test_its_identities_are_read_out_of_the_base_blob(self):
+        """The header is gone from disk; the typedef it used to supply is not."""
+        repo = BigRepo.shared()
+        repo.reset()
+        self._mutate(repo)
+        touched, _defined, _total, err = CDA.changed_scope("HEAD", repo.root)
+        self.assertIsNone(err)
+        self.assertIn("include/types.h", touched)
+        seeds = CDA.changed_type_names("HEAD", touched, repo.root)
+        self.assertIn("tdef_handle", seeds)
+
+    def test_a_deleted_symbols_file_still_names_the_rows_it_removed(self):
+        """The configuration half of the same rule."""
+        repo = BigRepo.shared()
+        repo.reset()
+        (repo.root / "config" / "arm9" / "symbols.txt").unlink()
+        repo.write("README.md", "fixture, touched\n")
+        total, err = CDA.changed_paths("HEAD", repo.root)
+        self.assertIsNone(err)
+        self.assertIn("config/arm9/symbols.txt", total)
+        names, paths = CDA.changed_config_symbols("HEAD", total, repo.root)
+        self.assertEqual(paths, ["config/arm9/symbols.txt"])
+        self.assertIn("cfg_other_0", names)
+
+    def test_a_deleted_SOURCE_is_still_out_of_scope(self):
+        """The carve-out that stays. A vanished definition is a name that no longer
+        resolves, which is `check_references.py`'s question. Control: unchanged."""
+        repo = BigRepo.shared()
+        repo.reset()
+        (repo.root / "src" / "filler_0001.c").unlink()
+        repo.write("README.md", "fixture, touched\n")
+        total, err = CDA.changed_paths("HEAD", repo.root)
+        self.assertIsNone(err)
+        self.assertNotIn("src/filler_0001.c", total)
+
+
+class BomTests(unittest.TestCase):
+    """A UTF-8 BOM is not part of the first token.
+
+    `\\ufefftypedef unsigned short u16;` does not match `^typedef\\b`, so the typedef
+    that opens `src/func_ov065_021183c8.c` -- the one file in this tree with a BOM --
+    reached the declarator parser.
+
+    HONEST LABEL: unlike the four classes above, these two pass on the parser as it was.
+    The BOM was latent there because an uninitialised declarator was dropped before
+    anything looked at it; the moment `int target;` became a definition it turned into a
+    definition of a symbol called `u16`, which is how it was found. They guard a
+    regression this branch introduced and then fixed, not one the review reported.
+    """
+
+    def test_a_typedef_behind_a_BOM_is_still_a_typedef(self):
+        decls, defs, _u = CDA.parse_file(
+            "src/x.c", "﻿typedef unsigned short u16;\n", {})
+        self.assertEqual([d.symbol for d in defs], [])
+        self.assertEqual([d.symbol for d in decls], [])
+
+    def test_the_one_real_file_with_a_BOM_defines_no_type_name(self):
+        rel = "src/func_ov065_021183c8.c"
+        path = REPO / rel
+        if not path.exists():
+            self.skipTest("%s is not in this tree" % rel)
+        self.assertEqual(path.read_bytes()[:3], b"\xef\xbb\xbf")
+        _d, defs, _u = CDA.parse_file(
+            rel, path.read_text(encoding="utf-8", errors="replace"),
+            CDA.scalar_typedefs(REPO))
+        self.assertEqual([d.symbol for d in defs if d.symbol in ("u8", "u16")], [])
 
 
 if __name__ == "__main__":

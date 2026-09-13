@@ -7,7 +7,7 @@
 # gate this repo owns stays green: the bytes are right in all three objects, and
 # `check_references.py` only asks whether the name exists at all.
 #
-# THIS IS NOT HYPOTHETICAL AND IT IS NOT SMALL. The whole-tree run finds 23,151
+# THIS IS NOT HYPOTHETICAL AND IT IS NOT SMALL. The whole-tree run finds 23,152
 # disagreements across 4,732 symbols, among them the five wrong declarations of
 # `__cxa_vec_ctor` that the review of #2455 found by hand -- three files declaring an
 # `int` return and two a `void *`, against a definition that returns `void`. That
@@ -15,11 +15,28 @@
 # highest-value unbuilt gate". Finding it by hand took a reviewer an afternoon and one
 # symbol. This job is the reason that stops being a hand search.
 #
-# A DECLARATION IS EVIDENCE, WHICH IS WHY IT MATTERS THAT IT IS RIGHT. It is the only
-# surviving statement about what the original C++ said -- the mangled name states the
-# rest, the body states nothing. And the host port compiles these same files with a
-# compiler that DOES check declarations, where `signature-mismatch` is the largest
-# non-trivial failure bucket.
+# WHAT A FINDING MEANS, AND WHAT IT DOES NOT. Both sides are RECONSTRUCTIONS: a
+# declaration and the definition it names are two independent guesses at one interface,
+# and a finding says they CONTRADICT each other -- not which one is wrong. The
+# declaration is not privileged; a definition recovered from a disassembly carries
+# guessed types too. What settles it is the codegen the definition actually produced,
+# what the call sites pass and do with the result, the class names the ROM's RTTI
+# records, and the argument list a mangled `_Z` name spells out. Read those before
+# editing either side: making the two agree on the WRONG type is a regression this job
+# cannot see.
+#
+# THE BYTE GATES DO COMPILE DECLARATIONS. `mwccarm` type-checks every declaration in a
+# translation unit against that file's own uses, and a byte-identical object is proof
+# about the codegen they produced. What no byte gate does is compare ONE translation
+# unit's declaration against ANOTHER's definition. That cross-TU contract is the gap
+# this job fills, and all of it.
+#
+# IT IS WORTH FIXING because the host port compiles these same files with a compiler
+# that DOES check across the tree, where `signature-mismatch` is the largest non-trivial
+# failure bucket. The runtime cost varies: `int` against `void` on ARM usually means the
+# caller reads a dead r0, while a wrong arity, a mismatched pointer or a struct return
+# can genuinely put caller and callee on different frame layouts. A mismatched return
+# type does NOT universally imply stack corruption.
 #
 # RATCHET, NOT A SWEEP, AND EMPHATICALLY NOT A CLEANUP. `config/decl-agreement-baseline.json`
 # banks every disagreement present when the gate was built. Those are NOT text edits
@@ -80,10 +97,13 @@ jobs:
       # arity mismatch MUST be reported, `u32` and `unsigned int` MUST NOT be, and a
       # two-file scan MUST exit non-zero instead of reporting a clean tree.
       #
-      # Four more are the false-pass paths reported on #2471, and they cost about a
-      # minute between them: `--changed` only means anything on a scan past the tool's
-      # own floors, so each one builds a 2,100-source git repo and mutates it rather
-      # than asserting over a two-file toy the tool would refuse to pass at all.
+      # The rest are the false-pass paths reported on #2471, first four and then four
+      # more on re-review, and they cost about a minute between them: `--changed` only
+      # means anything on a scan past the tool's own floors, so each one builds a
+      # 2,100-source git repo and mutates it rather than asserting over a two-file toy
+      # the tool would refuse to pass at all. Seventeen of them FAIL on the parser as
+      # it was; the controls beside them pass in both states, which is what says a
+      # green run is not a harness that stopped looking.
       - name: The gate's own tests
         run: python -m unittest tools.test_check_decl_agreement -v
 
