@@ -420,8 +420,8 @@ def classify_c(dcanon, bcanon):
     return "width-or-sign"
 
 
-C_CLASSES = ("void-vs-value", "pointer-shape", "pointer-vs-scalar",
-             "width-or-sign", "asm-body")
+C_CLASSES = ("two-headers", "void-vs-value", "pointer-shape",
+             "pointer-vs-scalar", "width-or-sign", "asm-body")
 
 
 def definition_index(root):
@@ -456,6 +456,39 @@ def definition_index(root):
     return out
 
 
+# `extern "C" void func_ov006_020c3e70(char *t);` in a class header. The
+# linkage specifier is optional because both spellings appear.
+OTHER_HEADER_ROW = re.compile(
+    r"^\s*extern\s+(?:\"C\"\s+)?(.+?)\s*(func_\w+)\s*\(", re.M)
+
+
+def other_header_decls(root):
+    """name -> [(header path, line, declared type)] outside decl_common.h.
+
+    The third place a return type for one of these symbols can live, and the
+    one that bites hardest: decl_common.h and a class header are BOTH included
+    by the same translation unit, so a disagreement between them is not a
+    silent wrong type, it is `illegal overloading` and the file does not
+    compile. Five pairs disagree on this tree.
+
+    Found the hard way. Correcting four decl_common.h rows from `void` to
+    `void*` broke six sources that include both headers, and prepush_linkcheck
+    reported the breakage as NO-SYM/len-mismatch -- a WARNING -- because a
+    compile that produces no object produces no length to compare. A compile
+    error that reads as a warning is the reason this check exists at all.
+    """
+    out = {}
+    for path in sorted((root / "include").rglob("*.h")):
+        if path.name == "decl_common.h":
+            continue
+        text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+        for m in OTHER_HEADER_ROW.finditer(text):
+            out.setdefault(m.group(2), []).append(
+                (path.relative_to(root).as_posix(),
+                 text[:m.start()].count("\n") + 1, m.group(1).strip()))
+    return out
+
+
 SYMBOL_ROW = re.compile(r"^(\S+) kind:function\(", re.M)
 
 
@@ -486,13 +519,21 @@ def check_plain_c(root=REPO):
     aliases = scalar_aliases(root)
     index = definition_index(root)
     symbols = function_symbols(root)
+    elsewhere = other_header_decls(root)
     rows = []
     acct = {"rows": 0, "no_definition": 0, "dead_row": 0, "unrecovered": 0,
             "typedef_equivalent": 0, "asm_body": 0, "compared": 0,
-            "symbol_table": len(symbols)}
+            "symbol_table": len(symbols), "also_in_a_class_header": 0}
     for m in C_DECL_ROW.finditer(decl):
         dtype, sym = m.group(1).strip(), m.group(2)
         acct["rows"] += 1
+        # Checked before the body, and whether or not there IS a body: two
+        # headers that disagree do not compile when one file includes both.
+        for hpath, hline, htype in elsewhere.get(sym, []):
+            acct["also_in_a_class_header"] += 1
+            if canon_c_type(htype, aliases) != canon_c_type(dtype, aliases):
+                rows.append((sym, dtype, htype, "two-headers",
+                             f"{hpath}:{hline}"))
         hit = index.get(sym)
         if hit is None:
             # Either the row is stale -- src/engine/message/func_0201fe08.c is
@@ -531,8 +572,9 @@ def report_plain_c(rows, acct, summary):
         if not hits:
             continue
         print(f"\n  {kind} ({len(hits)})")
-        for sym, dtype, btype, _k, rel in hits:
-            print(f"    {sym:<26s} decl '{dtype}'  body '{btype}'  {rel}")
+        for sym, dtype, btype, kind, rel in hits:
+            other = "header" if kind == "two-headers" else "body"
+            print(f"    {sym:<26s} decl_common '{dtype}'  {other} '{btype}'  {rel}")
     if summary:
         print(f"\n  func_* rows in decl_common.h    {acct['rows']}")
         print(f"    no definition anywhere in src/   {acct['no_definition']}")
@@ -541,6 +583,7 @@ def report_plain_c(rows, acct, summary):
                   "  (no recovered body yet)")
             print(f"      the name is gone from config   {acct['dead_row']}"
                   "  (DEAD ROW: renamed away, declaration left behind)")
+        print(f"    also declared in a class header  {acct['also_in_a_class_header']}")
         print(f"    COMPARED                         {acct['compared']}")
         print(f"      of those, hand-written asm     {acct['asm_body']}")
         print(f"      typedef-equivalent spellings   {acct['typedef_equivalent']}"

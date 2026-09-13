@@ -702,6 +702,43 @@ class ThePlainCHalfIsAdvisory(unittest.TestCase):
             self.assertEqual(macct["rows"], 1)   # only the _Z row
             self.assertEqual(cacct["rows"], 1)   # only the func_ row
 
+    def test_a_class_header_that_redeclares_the_row_differently(self):
+        """The disagreement that does not compile, rather than one that lies.
+
+        decl_common.h and a class header are both included by the same
+        translation unit, so two different return types for one extern "C" name
+        is `illegal overloading` and the file does not build. Four such pairs
+        were created by correcting decl_common.h alone, and prepush_linkcheck
+        reported the breakage as NO-SYM -- a WARNING -- because a compile that
+        produces no object produces no length to compare.
+        """
+        with Tree('extern void*func_ov006_020c3e70(char*);\n',
+                  dScMgFlower_c='extern "C" void func_ov006_020c3e70(char *t);\n',
+                  src={"func_ov006_020c3e70.c":
+                       "void *func_ov006_020c3e70(char *t)\n{\n    return t;\n}\n"}) as t:
+            rows, acct = t.check_c()
+            self.assertEqual(acct["also_in_a_class_header"], 1)
+            self.assertEqual([(r[0], r[3], r[4]) for r in rows],
+                             [("func_ov006_020c3e70", "two-headers",
+                               "include/dScMgFlower_c.h:1")])
+
+    def test_a_class_header_that_agrees_is_silent(self):
+        with Tree('extern void*func_ov006_020c3e70(char*);\n',
+                  dScMgFlower_c='extern "C" void *func_ov006_020c3e70(char *t);\n',
+                  src={"func_ov006_020c3e70.c":
+                       "void *func_ov006_020c3e70(char *t)\n{\n    return t;\n}\n"}) as t:
+            rows, acct = t.check_c()
+            self.assertEqual(acct["also_in_a_class_header"], 1)
+            self.assertEqual(rows, [])
+
+    def test_a_class_header_is_checked_even_with_no_body(self):
+        """Two headers disagree whether or not anyone has recovered the body."""
+        with Tree("extern int func_02010000(void);\n",
+                  SomeClass='extern "C" void func_02010000(void);\n') as t:
+            rows, acct = t.check_c()
+            self.assertEqual(acct["compared"], 0)
+            self.assertEqual([r[3] for r in rows], ["two-headers"])
+
     def test_a_row_with_no_body_and_no_symbol_is_a_dead_row(self):
         """112 rows on main are this: a name renamed away, the row left behind.
 
