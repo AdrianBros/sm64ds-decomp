@@ -12,6 +12,21 @@ typedef signed int     s32;
 typedef unsigned long long u64;
 typedef signed long long   s64;
 
+/* size_t, which C++ requires as the first parameter of every `operator new`.
+   The two compilers that build this tree spell it differently and each refuses
+   the other's spelling, because the rule is on the TYPE and not on the width --
+   all three candidates are four bytes here. mwccarm rejects
+   `operator new(unsigned int)` with "illegal 'operator' declaration"; 32-bit
+   MSVC rejects `operator new(unsigned long)` with C2821, "first formal
+   parameter to 'operator new' must be 'size_t'". Neither arm below is visible
+   to the other compiler, so no ROM byte moves: mwccarm keeps the `unsigned
+   long` the nine actor headers already declared. */
+#ifdef _MSC_VER
+#include <stddef.h>          /* the host's own size_t, so the host rule holds by definition */
+#else
+typedef unsigned long size_t;
+#endif
+
 /* 20.12 fixed-point scalar, as used by the SDK/game maths.
 
    NOT named `Fix12`. In the original C++ that is a class TEMPLATE, not a scalar typedef;
@@ -50,7 +65,10 @@ typedef struct Vector3 {
 #ifdef __cplusplus
 /* 0xc, and the ROM agrees twice over: ChiefChilly's arrays stride by 0xc and
    its __cxa_vec_cleanup calls pass 0xc as the element size. */
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char Vector3_size_must_be_0xc[sizeof(Vector3) == 0xc ? 1 : -1];
+#endif
 #endif
 
 typedef struct Vector3s {
@@ -65,7 +83,10 @@ typedef struct Vector3s {
 } Vector3s;
 
 #ifdef __cplusplus
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char Vector3s_size_must_be_0x6[sizeof(Vector3s) == 6 ? 1 : -1];
+#endif
 #endif
 
 

@@ -66,7 +66,7 @@
  * closes there and nothing this class owns reaches higher. The leaves allocate
  * more -- daDkk_c_classInit passes 928 = 0x3a0 and Thwomp_Spawn 932 = 0x3a4 -- and
  * because the two disagree, no literal fixes this class's end the way
- * FloatingFloorBfs fixes daObjUkiyuka_c's. 0x360..0x3a0 exists in both leaves and
+ * daObjKm2_Ukishima_c fixes daObjUkiyuka_c's. 0x360..0x3a0 exists in both leaves and
  * is declared on them; if a later pass shows both reading the same offsets in it,
  * it moves up here.
  *
@@ -118,7 +118,10 @@ struct daDsnBase_c : dBgActor_c {
     virtual s32 Render();              /* slot 9 -- ov091:0x02133210 */
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daDsnBase_c_size_must_be_0x360[sizeof(daDsnBase_c) == 0x360 ? 1 : -1];
+#endif
 
 #endif /* __cplusplus */
 

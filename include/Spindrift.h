@@ -54,7 +54,7 @@ struct Spindrift : dEnemyBase_c {
     virtual ~Spindrift();
 
     virtual s32   OnYoshiTryEat();         /* slot 18 */
-    virtual int   OnTurnIntoEgg(Player &player); /* slot 19 */
+    virtual void  OnTurnIntoEgg(Player &player); /* slot 19 */
     virtual s32   OnAimedAtWithEgg();      /* slot 29 */
 
     /* --- non-virtual --- */
@@ -64,6 +64,9 @@ struct Spindrift : dEnemyBase_c {
     int Render();
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char Spindrift_size_must_be_0x39c[sizeof(Spindrift) == 0x39c ? 1 : -1];
+#endif
 
 #endif /* SPINDRIFT_H */

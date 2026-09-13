@@ -47,19 +47,22 @@ struct daObjFl_Gura_c : daObjGuragura_c {
     int CleanupResources();            /* slot  3 */
     int InitResources();               /* slot  0 */
 
-    static void *operator new(unsigned long size);
+    static void *operator new(size_t size);
 
     /* Declared last and inline so class instantiation emits the retail D1/D0
        pair in cartridge order without a separate leaf D2 body. */
     virtual ~daObjFl_Gura_c() {}
 };
 
-inline void *daObjFl_Gura_c::operator new(unsigned long size)
+inline void *daObjFl_Gura_c::operator new(size_t size)
 {
     return _ZN7fBase_cnwEj((unsigned)size);
 }
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daObjFl_Gura_c_size_must_be_0x350[sizeof(daObjFl_Gura_c) == 0x350 ? 1 : -1];
+#endif
 
 #endif /* __cplusplus */
 

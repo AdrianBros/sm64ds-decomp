@@ -80,9 +80,12 @@ struct BabyPenguin : dActor_c {
     virtual s32  Render();           /* slot  9 */
     virtual void OnPendingDestroy();      /* slot 12 */
     virtual s32  OnYoshiTryEat();         /* slot 18 */
-    virtual int  OnTurnIntoEgg(Player &player); /* slot 19 */
+    virtual void OnTurnIntoEgg(Player &player); /* slot 19 */
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char BabyPenguin_size_must_be_0x370[sizeof(BabyPenguin) == 0x370 ? 1 : -1];
+#endif
 
 #endif
