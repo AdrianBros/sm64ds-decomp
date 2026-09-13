@@ -12,6 +12,22 @@
  * members, a type named in a member's own signature -- is hoisted below, and
  * those tags are made unique.
  *
+ * THREE MORE SHAPES ARE HOISTED FOR THE HOST FRONT END, not for mwccarm.  A
+ * body may not declare `extern` with a function-local class type, and every
+ * virtual of a local class must be defined in that same body; mwccarm accepts
+ * both, C++ does not ([basic.link]: a local class has no linkage), and no host
+ * switch reaches either -- `/permissive` was probed and changes nothing.  So
+ * the nine plain shapes an extern named, and the two shadow scaffolds whose
+ * virtuals are declared and never defined, sit in the block below with unique
+ * tags; the five `State` placeholders resolve to Player::State, which is what
+ * those ROM symbols are; and three symbols that a body declared `int` while
+ * this same file defines them `void` (func_ov002_020c14b8,
+ * func_ov002_020c2b08, func_ov002_020caf68, whose results every call site
+ * discards) keep one spelling.  Each body still keeps its own declaration of
+ * every object.  Measured byte-neutral: the pinned 2004/b56 object for the
+ * whole TU has the same sha256 before and after, and match.py reports 2004/b56
+ * for all twenty-one members whose text changed.
+ *
  * SOURCE ORDER IS ROM-ASCENDING AND `#pragma defer_codegen off` IS LOAD-BEARING.
  * Do not reorder the members and do not delete that pragma.  Ordinal 35,
  * _ZN6Player7SetAnimEji5Fix12IiEj, reproduces only under `#pragma
