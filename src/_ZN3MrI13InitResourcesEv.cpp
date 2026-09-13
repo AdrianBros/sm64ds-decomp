@@ -12,14 +12,30 @@
 //   ROM:  mov r2,#1 / mov r1,r0 / add r0,r4,#0xd4 / mov r3,r2
 //   here: mov r1,r0 / add r0,r4,#0xd4 / mov r2,#1 / mov r3,r2
 //
-// PROBED, and this is the useful part for anyone who returns to it: mwccarm 2004/b56 DOES
-// emit the ROM's constant-first order, but only when the basic block holding the call also
-// contains a condition-code comparison. `if (!SetFile(...)) return;` and even a comparison
-// on an unrelated global (`g = (h == 3);`) both flip it; a plain call, an if with an empty
-// body, a switch, a goto label, a stored result, a trailing loop whose compare sits in the
-// loop latch, and a following call all leave it alone. The ROM's own entry block runs from
-// the prologue to the loop preheader with no cmp in it, so the trigger cannot be paid for
-// out of instructions the cartridge already spends, and the order is out of reach here.
+// MECHANISM, isolated in a micro-lab on 2026-09-13 (run link100 lane CRK-O), and this is
+// the useful part for anyone who returns to it: mwccarm 2004/b56 emits the ROM's
+// constant-first order for this exact call shape. What loses it is the number of CALLS
+// already in the basic block. Minimal reproduction, C or C++, the same either way:
+//   void f(char *c){ loadf(gb); BMD *b = loadf(ga); callee(c+0xd4, b, 1, 1); }
+// gives `mov r2,#1 / mov r1,r0 / mov r3,r2 / add r0,r4,#0xd4` -- constant FIRST. Add any
+// third call ahead of it (`blue(); loadf(gb); b = loadf(ga);`) and it becomes
+// `mov r1,r0 / add r0,r4,#0xd4 / mov r2,#1 / mov r3,r2`, this body's order. The threshold
+// is calls, not instructions and not pool entries: two calls plus three stores stays
+// constant-first, three calls with no arguments at all does not, and calls AFTER the site
+// do not count (two before and three after is still constant-first).
+//
+// That supersedes the earlier reading of the same evidence ("it needs a condition-code
+// comparison in the block"). A cmp does flip it, but so does a fourth statement of almost
+// any kind: what a cmp buys is a change to the block, not a special flag. Every zero-cost
+// way of splitting the block off the third call is measured inert -- `goto L; L:`, a label
+// under a forward goto, `do { } while (0)`, `if (1)`, a bare nested scope, and putting the
+// first two calls inside a `static inline` helper all flatten before scheduling and leave
+// the count at three. `if (c) blue();` does restore the order, and that is the point: it
+// costs a cmp and a branch the cartridge does not spend.
+//
+// The ROM's entry block has exactly three calls before SetFile (LoadBlueCoinModel and the
+// two Model::LoadFile), all three are real bl instructions in the cartridge, and nothing
+// source-side removes one from the block. So the slot is out of reach on this build.
 //
 // MEASURED INERT, first pass: 14 conditional-context spellings of the call, named/const/
 // register/bool/byte/short constants, nested and member-call forms of SetFile, 4 inline-
@@ -41,13 +57,20 @@
 // give the SAME 2. Every other installed build misses the size (1.2/sp3-sp4 0x290,
 // 2.0 0x288, dsi 0x27c).
 //
-// So the verdict is a ROM-compiler build delta, in the same CLASS as notes 6bs but not
-// the same mechanism: 6bs is a register CHOICE (the ROM skips a just-dead register),
-// this is an emission SLOT for an instruction whose registers already agree. What the
-// two share is the signature -- a residue that is byte-identical across every installed
-// build able to produce the right size, and unmoved by any source spelling, belongs to
-// the compiler the cartridge was actually built with (CW NITRO V0.6.1, notes 6ah,
-// unarchived) and not to a spelling nobody has found yet.
+// Re-measured 2026-09-13 (lane CRK-O) with the pragma sweep redone the way notes 6cf says
+// to run it, as a REPLACEMENT and not as an addition: 68 pragma names are accepted by
+// 2004/b56 and all 136 on/off cells score 3 at the exact size, so there is no narrow
+// pragma hiding here the way there was on func_ov015_021114f0. Also inert this pass:
+// declaring the callee with default arguments for the two 1s (both as `SetFile(bmd)` and
+// as `SetFile(bmd, 1)`) and calling the mangled symbol directly as an extern "C" function
+// with the this-pointer spelled four ways.
+//
+// So the verdict is a ROM-compiler build delta with a named threshold: 2004/b56 will not
+// hoist an argument constant over a call-return copy once three calls precede the site in
+// the block, and the cartridge's compiler (CW NITRO V0.6.1, notes 6ah, unarchived) will.
+// This is NOT notes 6bs: 6bs is a register CHOICE and every register here already agrees.
+// It is an emission SLOT, and the lever that would buy it costs instructions the ROM does
+// not contain.
 #include "MrI.h"
 
 struct BMD_File;
