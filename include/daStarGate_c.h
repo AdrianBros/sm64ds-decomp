@@ -37,7 +37,7 @@ struct daStarGate_c : dActor_c {
         StateFunc main;
     };
 
-    static void *operator new(unsigned long size);
+    static void *operator new(size_t size);
 
     u8          pad_0d0[0x4];
     CommonModel mModel;          /* 0x0d4 */
@@ -79,16 +79,19 @@ struct daStarGate_c : dActor_c {
     static State ST_UNLOCKING;
 };
 
-inline void *daStarGate_c::operator new(unsigned long size)
+inline void *daStarGate_c::operator new(size_t size)
 {
     return _ZN7fBase_cnwEj((unsigned int)size);
 }
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daStarGate_c_State_size_must_be_0x10[
     sizeof(daStarGate_c::State) == 0x10 ? 1 : -1];
 typedef char daStarGate_c_size_must_be_0x118[
     sizeof(daStarGate_c) == 0x118 ? 1 : -1];
 typedef char daStarGateInfo_size_must_be_0x6[
     sizeof(daStarGateInfo) == 0x6 ? 1 : -1];
+#endif
 
 #endif /* DASTARGATE_C_H */

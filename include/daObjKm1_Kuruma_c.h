@@ -30,19 +30,22 @@ struct daObjKm1_Kuruma_c : daObjKuruma_c {
     int CleanupResources();            /* slot  3 */
     int InitResources();               /* slot  0 */
 
-    static void *operator new(unsigned long size);
+    static void *operator new(size_t size);
 
     /* MEASURED -- INLINE ON PURPOSE. Declaring this last makes the class TU
        emit D1 before D0, in the cartridge's order, without a leaf D2 body. */
     virtual ~daObjKm1_Kuruma_c() {}    /* slots 16 (D1), 17 (D0) */
 };
 
-inline void *daObjKm1_Kuruma_c::operator new(unsigned long size)
+inline void *daObjKm1_Kuruma_c::operator new(size_t size)
 {
     return _ZN7fBase_cnwEj((unsigned)size);
 }
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daObjKm1_Kuruma_c_size_must_be_0x320[sizeof(daObjKm1_Kuruma_c) == 0x320 ? 1 : -1];
+#endif
 
 #endif /* __cplusplus */
 

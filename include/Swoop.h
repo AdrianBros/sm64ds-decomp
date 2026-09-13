@@ -67,7 +67,7 @@ struct Swoop : dEnemyBase_c {
     virtual ~Swoop();
 
     virtual s32   OnYoshiTryEat();         /* slot 18 */
-    virtual int   OnTurnIntoEgg(Player &player); /* slot 19 */
+    virtual void  OnTurnIntoEgg(Player &player); /* slot 19 */
     virtual s32   OnAimedAtWithEgg();      /* slot 29 */
 
     int Behavior();
@@ -77,6 +77,9 @@ struct Swoop : dEnemyBase_c {
     int Render();
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char Swoop_size_must_be_0x440[sizeof(Swoop) == 0x440 ? 1 : -1];
+#endif
 
 #endif /* SWOOP_H */

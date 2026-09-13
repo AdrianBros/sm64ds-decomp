@@ -61,7 +61,7 @@ struct Skeeter : dEnemyBase_c {
     virtual ~Skeeter();
 
     virtual s32   OnYoshiTryEat();         /* slot 18 */
-    virtual int   OnTurnIntoEgg(Player &player); /* slot 19 */
+    virtual void  OnTurnIntoEgg(Player &player); /* slot 19 */
     virtual s32   OnAimedAtWithEgg();      /* slot 29 */
 
     int Behavior();
@@ -71,6 +71,9 @@ struct Skeeter : dEnemyBase_c {
     int Render();
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char Skeeter_size_must_be_0x3b0[sizeof(Skeeter) == 0x3b0 ? 1 : -1];
+#endif
 
 #endif /* SKEETER_H */

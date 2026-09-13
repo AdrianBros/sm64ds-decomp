@@ -61,7 +61,7 @@ struct daPropeller_Heyho_c : dEnemyBase_c {
     virtual ~daPropeller_Heyho_c() {}
 
     virtual s32   OnYoshiTryEat();         /* slot 18 */
-    virtual int   OnTurnIntoEgg(Player &player); /* slot 19 */
+    virtual void  OnTurnIntoEgg(Player &player); /* slot 19 */
     virtual s32   OnAimedAtWithEgg();      /* slot 29 */
 
     int Behavior();
@@ -71,7 +71,10 @@ struct daPropeller_Heyho_c : dEnemyBase_c {
     int Render();
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daPropeller_Heyho_c_size_must_be_0x3e8[
     sizeof(daPropeller_Heyho_c) == 0x3e8 ? 1 : -1];
+#endif
 
 #endif /* DAPROPELLER_HEYHO_C_H */

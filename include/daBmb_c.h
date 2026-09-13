@@ -114,7 +114,7 @@ struct daBmb_c : dEnemyBase_c {
     virtual ~daBmb_c() {}
 
     virtual s32   OnYoshiTryEat();         /* slot 18 -- key function */
-    virtual int   OnTurnIntoEgg(Player &player); /* slot 19 */
+    virtual void  OnTurnIntoEgg(Player &player); /* slot 19 */
     virtual s32   OnAimedAtWithEgg();      /* slot 29 */
 
     int Behavior();
@@ -137,7 +137,10 @@ struct daBmb_c : dEnemyBase_c {
     void State5();
 };
 
+#ifndef SM64DS_PLATFORM_PC
+/* ROM layout under mwccarm; host ABI divergence is tracked separately. */
 typedef char daBmb_c_size_must_be_0x400[sizeof(daBmb_c) == 0x400 ? 1 : -1];
+#endif
 
 /* The vtable this class's translation unit emits, declared here so the registry
    factory can name it.  daBmb_c_classInit is an `extern "C"` factory and not a
