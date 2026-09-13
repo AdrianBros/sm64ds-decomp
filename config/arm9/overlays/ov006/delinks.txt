@@ -2282,6 +2282,9 @@ src/func_ov006_020ea8e0.c:
     complete
     .text start:0x020ea8e0 end:0x020ea914
 
+src/func_ov006_020ea914.cpp:
+    .text start:0x020ea914 end:0x020eac38
+
 src/actors/dScMgHanachan_c.cpp:
     complete
     .text start:0x020eac38 end:0x020ede18
