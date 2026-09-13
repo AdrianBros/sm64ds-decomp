@@ -280,16 +280,20 @@ int func_ov002_020af1dc(char* c){
 /* ROM ordinal 7 -- func_ov002_020af218, 0x020af218, size 0x30 */
 /* -------------------------------------------------------------------------- */
 // @symbol func_ov002_020af218
-/* The second parameter is DECLARED AND UNUSED, and that is the point: five
-   callers below pass 0xbb8 in r1 while this body never reads it and leaves it
-   for _ZN8dActor_c15IsPlayerInRangeEi, which the shard likewise calls with one
-   argument. Declaring the parameter preserves each caller's argument setup and
-   costs this function nothing. */
+/* The second parameter is FORWARDED, not merely declared. The five callers
+   below pass 0xbb8 in r1 and this body hands that same word to
+   _ZN8dActor_c15IsPlayerInRangeEi, whose ROM name mangles as
+   dActor_c::IsPlayerInRange(int): `this` in r0 and one `int` in r1, exactly as
+   include/decl_Actor.h declares it and as the other five call sites in this
+   file already spell it. The ROM emits no `mov` before the `bl` because r1
+   still holds the incoming range, so naming the argument is byte-neutral here
+   and stops the call from handing the callee whatever r1 happens to hold on a
+   host ABI. */
 extern "C" {
 int func_ov002_020af218(char* c, int range){
-  extern int _ZN8dActor_c15IsPlayerInRangeEi(void*);
+  extern int _ZN8dActor_c15IsPlayerInRangeEi(void*, int);
   extern int func_ov002_020aefa4(void*);
-  *(char*)(c+0x38e)=(char)_ZN8dActor_c15IsPlayerInRangeEi(c);
+  *(char*)(c+0x38e)=(char)_ZN8dActor_c15IsPlayerInRangeEi(c, range);
   unsigned char v=*(unsigned char*)(c+0x38e);
   if(v==0) return v;
   return func_ov002_020aefa4(c);
