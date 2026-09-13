@@ -1195,6 +1195,14 @@ void func_ov014_021115c0(char *r4) {
 /* -------------------------------------------------------------------------- */
 extern "C" {  /* .c-derived member: C linkage for the whole block */
 // @symbol func_ov014_0211150c
+/* THE EARLY EXITS ARE SPELT AS NESTED IFS, NOT `return;`. mwccarm accepts a
+   valueless `return` in a non-void function; C++ does not, and no host option
+   reaches it (MSVC C2561). The ROM sets no return value on these paths -- it
+   leaves r0 holding whatever the last call left there and branches straight to
+   the epilogue -- so the faithful shape is a body that reaches its closing
+   brace with nothing to return, which is what the host already accepts for the
+   rest of this family. Byte-identical under 2004/b56: the compiled object is
+   unchanged. */
 int func_ov014_0211150c(char *c) {
     /* views moved to block scope: this file's return/parameter spellings differ
      * from the TU's canonical declarations (C linkage inherited). */
@@ -1207,9 +1215,11 @@ int func_ov014_0211150c(char *c) {
     *(int*)(c + 0x88) = *(int*)(c + 0x80);
     *(int*)(c + 0x84) = *(int*)(c + 0x88);
     ApproachAngle(c + 0x8c, -0x4000, 4, 0x1000, 0x400);
-    if (Math_Function_0203b14c(c + 0x5f8, 0x64000, 0x800, 0x10000, 0x800) != 0) return;
-    if (DecIfAbove0_Short(c + 0x5fc) != 0) return;
-    func_ov014_02111ebc(c, 1);
+    if (Math_Function_0203b14c(c + 0x5f8, 0x64000, 0x800, 0x10000, 0x800) == 0) {
+        if (DecIfAbove0_Short(c + 0x5fc) == 0) {
+            func_ov014_02111ebc(c, 1);
+        }
+    }
 }
 }
 
