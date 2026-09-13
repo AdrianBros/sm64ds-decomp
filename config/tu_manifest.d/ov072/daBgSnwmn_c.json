@@ -493,50 +493,7 @@
       "target_address": "0x020100dc"
     }
   ],
-  "compiler_only_output": [
-    {
-      "symbol": "_ZTI7fBase_c",
-      "disposition": "deadstrip-data",
-      "reason": "inherited vague-linkage RTTI copy; canonical home is arm9:0x02086d70, outside this TU's licensed .data",
-      "canonical_module": "arm9",
-      "canonical_address": "0x02086d70"
-    },
-    {
-      "symbol": "_ZTS7fBase_c",
-      "disposition": "deadstrip-data",
-      "reason": "inherited vague-linkage type-name string; canonical home is arm9:0x02086e60",
-      "canonical_module": "arm9",
-      "canonical_address": "0x02086e60"
-    },
-    {
-      "symbol": "_ZTS7dBase_c",
-      "disposition": "deadstrip-data",
-      "reason": "inherited vague-linkage type-name string; canonical home is arm9:0x02086e54",
-      "canonical_module": "arm9",
-      "canonical_address": "0x02086e54"
-    },
-    {
-      "symbol": "_ZTS8dActor_c",
-      "disposition": "deadstrip-data",
-      "reason": "inherited vague-linkage type-name string; canonical home is arm9:0x0208e384",
-      "canonical_module": "arm9",
-      "canonical_address": "0x0208e384"
-    },
-    {
-      "symbol": "_ZTI7dBase_c",
-      "disposition": "deadstrip-data",
-      "reason": "inherited vague-linkage RTTI copy; canonical home is arm9:0x02086e78",
-      "canonical_module": "arm9",
-      "canonical_address": "0x02086e78"
-    },
-    {
-      "symbol": "_ZTI8dActor_c",
-      "disposition": "deadstrip-data",
-      "reason": "inherited vague-linkage RTTI copy; canonical home is arm9:0x0208e390",
-      "canonical_module": "arm9",
-      "canonical_address": "0x0208e390"
-    }
-  ],
+  "compiler_only_output": [],
   "externalized_output": [
     {
       "symbol": "_ZTI7fBase_c",

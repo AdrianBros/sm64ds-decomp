@@ -675,7 +675,7 @@
   "notes": [
     "daObjKb1Billboard_c is ROM-proven by ov044 RTTI/ZTS. daObjKb1Billboard_c_classInit, g_profile_KB1_BILLBOARD, and d_a_obj_kb1_billboard.cpp are reconstructed source-style names; exact original SM64DS spellings do not survive.",
     "UpdateModelTransform is an inferred private spelling. Its class ownership, no-argument call shape, body, ordering, relocations, and codegen are proven.",
-    "The factory is `return new daObjKb1Billboard_c()`. Leaf operator new(unsigned long) forwards to _ZN7fBase_cnwEj until fBase_c can declare it (#2570). The compiler-local registration node is @222 (was @214); #2513 keeps uniquifier rows on this class.",
+    "The factory is `return new daObjKb1Billboard_c()`. Leaf operator new(unsigned long) forwards to _ZN7fBase_cnwEj until fBase_c can declare it. The compiler-local registration node at 0x02111688 is @222.",
     "The actor TU owns .text, .init, .ctor, its class/profile .data, and its resource .bss. The earlier ov044 .data remains an independently extracted ROM-gap input in the final overlay link."
   ],
   "verification": {
