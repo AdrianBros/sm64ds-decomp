@@ -314,21 +314,36 @@ class GateStillWorksTests(unittest.TestCase):
 # one part of this file that reached outside a tmpdir, on the argument that a fixture
 # cannot show the resolution still works on history the tree really has.
 #
-# All four were orphaned when main was force-reset. They survive in any clone that was
-# already holding the loose objects -- which is every developer's, so the suite stayed
-# green locally -- while `actions/checkout` fetches only reachable history and cannot see
-# them at all. On a runner `_require` failed five times, and on 2026-09-13 the `offsets`
+# NOT a force-reset -- an identity SCRUB. At 07:50 EDT on 2026-09-13 the whole history
+# was rewritten (see tools/repin_commit_ids.py's docstring): the trees are identical, but
+# every commit got a new id, so all four pins stopped resolving. They survive in any clone
+# that was already holding the loose objects -- which is every developer's, so the suite
+# stayed green locally -- while `actions/checkout` fetches only reachable history and
+# cannot see them at all. On a runner `_require` failed five times, and the `offsets`
 # check went red on #2487, #2490, `match/f100-shapes` and `match/w4-exctab2`, none of
 # which had touched a header. A local green a runner cannot reproduce is the exact shape
-# this whole file exists to refuse, and it was load-bearing: nobody read the four sha
-# assertions for three weeks, because locally they passed.
+# this whole file exists to refuse. dc3dbbdfa re-pinned all four to their post-scrub ids
+# and main is green on a runner again; what follows is about the NEXT rewrite, not that
+# one.
 #
-# RE-PINNING WOULD RE-ARM IT. These commits are unreachable because history moved, and
-# history moves again. A fresh sha is a bet that no later reset, squash or rewrite lands
-# on it, and losing that bet turns a HEADER gate red for reasons that have nothing to do
-# with headers -- and a gate that lands red for unrelated reasons gets switched off. The
-# reconstruction below is built by real `git` in a tmpdir, so these tests assert the same
-# things and depend on no repository history whatsoever.
+# THIS IS NOT A RECURRENCE ARGUMENT, IT IS AN EXPOSURE ONE. Rewrites are rare: this
+# clone's `git reflog show origin/main` covers 872 fetches over 31 days with exactly one
+# forced-update, the 2026-09-13 scrub. The reason to stop pinning anyway is that the
+# material that triggered it is still here. The scrub was over a personal Windows
+# username in a hardcoded path -- tools/ovsweep.py:48, which now reads
+# `C:/Users/tango/...` -- and origin/main still spells five such paths under a different
+# username across four tracked files (notes/agents/LAUNCH.md,
+# notes/agents/references/pipeline-v1.md, notes/real-cpp-migration-runbook.md x2,
+# notes/tu-cpp-census-2026-08.md). The maintainer designed for the repeat: repin's
+# `--check` is documented as "the same predicate a pre-merge gate would use", dc3dbbdfa
+# swapped a real corpus id in tools/test_repin_commit_ids.py for a synthetic
+# `a1a1a1a1...` "so the test stays hermetic and idempotent under a future re-sweep", and
+# the treadmill already needed a second pass 98 minutes later (b9ba3a59b). This file is
+# the one repin names as more than stale prose, because a pin that no longer resolves
+# fails CI outright rather than merely reading wrong. Applying the same synthetic-fixture
+# treatment here finishes that job. The reconstruction below is built by real `git` in a
+# tmpdir, so these tests assert the same things and depend on no repository history
+# whatsoever.
 #
 # WHAT IS RECONSTRUCTED AND WHAT IS NOT. The counts are not invented. Each was measured
 # with `git diff --name-status <sha>^...<sha>` while the objects were still readable, and
