@@ -53,12 +53,11 @@ expected; it was the filter. The census was 428/412/413 with a plausible-soundin
 attached to the missing one.
 
 **Bare addresses.** Overlays share address space and two addresses host two different
-classes: `0x02114868` is `daObjWanwanShutter_c` (ov014) *and* `daObjBk_Fall_Block_c` (ov015);
-`0x021123fc` is `daObjTtWater_c` (ov033) *and* `daObjKm3_Kuruma_c` (ov047). Record identity
+classes: `0x02114868` is `daObjWanwanShutter_c` ([ov014](../config/arm9/overlays/ov014/symbols.txt)) *and* `daObjBk_Fall_Block_c` ([ov015](../config/arm9/overlays/ov015/symbols.txt)). `0x021123fc` is `daObjTtWater_c` ([ov033](../config/arm9/overlays/ov033/symbols.txt)) *and* `daObjKm3_Kuruma_c` ([ov047](../config/arm9/overlays/ov047/symbols.txt)). Record identity
 is `(module, addr)`.
 
 **Assuming edges stay inside an overlay.** **183 of 413 edges cross overlay boundaries** —
-every ov006 `dScMg*_c` scene derives from `dScMgBase_c` in ov004. A resolver that checks the
+every [ov006](../config/arm9/overlays/ov006/symbols.txt) `dScMg*_c` scene derives from `dScMgBase_c` in [ov004](../config/arm9/overlays/ov004/symbols.txt). A resolver that checks the
 owning overlay and then arm9 resolves 230 of 413. Order is: own module, arm9, then whatever
 `tools/overlay_residency.py` leaves, then say so.
 
@@ -225,11 +224,11 @@ matched source is deferred, because renaming it means rewriting those sources, w
 drags every referencing file into the PR and turns `validate` red even though the rename
 is byte-safe.
 
-`0x02113a60` left this list when ov036/daObjRcBuranko_c was promoted to a single TU: by
+`0x02113a60` left this list when [ov036](../config/arm9/overlays/ov036/symbols.txt)/[daObjRcBuranko_c](../src/game/actors/d_a_obj_rc_buranko.cpp) was promoted to a single TU: by
 then nothing in `src/` referenced the coined spelling at all, its `include/decl_common.h`
 declaration was dead, and the promoted TU's manifest needs the cartridge's own `_ZTS`
 name to bank the record as `deadstrip-data`. It is now
-`_ZTS16daObjRcBuranko_c` in `config/arm9/overlays/ov036/symbols.txt`.
+`_ZTS16daObjRcBuranko_c` in [config/arm9/overlays/ov036/symbols.txt](../config/arm9/overlays/ov036/symbols.txt).
 
 For some of the rest, deferral is more than procedural -- renaming would assert
 something false. `0x0211396c` exists in **both** ov018 and ov032. The file
