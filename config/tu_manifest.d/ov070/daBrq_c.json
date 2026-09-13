@@ -752,7 +752,7 @@
       },
       "tuRange": {
         "start": "0x02120570",
-        "end": "0x021210ac",
+        "end": "0x02121118",
         "differingBytes": 0,
         "firstDiff": null
       },
@@ -760,7 +760,7 @@
         {
           "section": ".text",
           "start": "0x02120570",
-          "end": "0x021210ac",
+          "end": "0x02121118",
           "differingBytes": 0,
           "firstDiff": null
         },
