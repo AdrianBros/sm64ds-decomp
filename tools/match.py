@@ -42,6 +42,22 @@ INCLUDE = REPO / "include"
 # on a successful compile. See notes/mwccarm-codegen.md 6as.
 DEFAULT_FLAGS = ("-O4,p -enum int -lang c99 -char signed -interworking -proc arm946e "
                  "-gccext,on -msgstyle gcc -w illpragmas")
+# The C++ lane needs one flag the C lane does not: `-Cpp_exceptions off`, which
+# `rombuild.CFLAGS` carries and DEFAULT_FLAGS does not. Without it mwccarm threads exception
+# cleanup through any function holding an object with a destructor, and the function's own
+# .text stops equalling the ROM's -- so a C++ candidate was being scored against a compile
+# the ROM build never performs. It is inert for a source with no exception state, which is
+# why this went unnoticed: measured per function on this tree, both flag sets, of the 6,200
+# committed //cpp rows config resolves a source for, 6,198 reproduce identically under both,
+# one reproduces ONLY with this flag (func_ov006_020ea914, whose "7-word floor" three lanes
+# measured was this defect), and none reproduces only without it. The same rescore over the
+# 17 //cpp near-miss rows that carry a stored target moves exactly that one row.
+# Kept OUT of DEFAULT_FLAGS on purpose: nearmiss/eval_pin.json pins DEFAULT_FLAGS verbatim
+# and tools/test_nearmiss_db.py::EvalPinGuardTests fails CI if it moves without a full
+# `nearmiss_db.py reeval`, which is lane-owned. See tools/build_pin.py (which derives its
+# flags from rombuild for the same reason), tools/swarm.py CPP_FLAGS, and
+# notes/mwccarm-codegen.md 6co.
+CPP_EXCEPTIONS_FLAG = "-Cpp_exceptions off"
 # The builds --all sweeps. This was a hand-written list of 12 while 25 mwccarm.exe were
 # installed, so `--all` ("sweep every known version") silently skipped 13 -- including
 # 2.0/sp1p5, sp1p6, sp1p7 and sp2p4, service packs of a family it already swept. Every
@@ -278,10 +294,15 @@ def main():
     # Auto-detect C++ the same way fdiff/swarm do: a leading //cpp marker means compile with
     # -lang c++ instead of the default -lang c99, so C++ candidates stop failing to compile
     # (the file is already .cpp, so it compiles in place - no temp copy needed).
+    # `-Cpp_exceptions off` rides along with the language flip, because the build compiles
+    # every C++ source with it and without it a source holding an object with a destructor
+    # gets exception cleanup the ROM's bytes do not have (see CPP_EXCEPTIONS_FLAG above).
     flags = args.flags
     try:
         if cfile.read_text(encoding="utf-8").startswith("//cpp") and "-lang c99" in flags:
             flags = flags.replace("-lang c99", "-lang c++")
+            if CPP_EXCEPTIONS_FLAG not in flags:
+                flags += " " + CPP_EXCEPTIONS_FLAG
     except OSError:
         pass  # a missing/unreadable candidate surfaces later at compile_c with a clearer error
     if args.bin:
