@@ -48,7 +48,7 @@
  *     goto-skip / do-once, crossed with equal-arm ternaries on BOTH call arguments under
  *     seven conditions and with pointer and unsigned spellings of each.
  *   * 135 pragma cells, the full accepted 2004/b56 vocabulary in both directions, run as
- *     REPLACEMENTS the way notes 6cf says to run them. All 3.
+ *     REPLACEMENTS the way notes 6cj says to run them. All 3.
  * MICRO-LAB (the mechanism, stated so the next lane does not re-derive it): in an isolated
  * six-line function, 2004/b56 NEVER lets a pool constant reach r0 when r0 is also an
  * outgoing argument holding a small immediate. Across {no preamble, one call, a loop, a

@@ -65,7 +65,7 @@
 // Cross-build: 2004/b56 is the ONLY installed build that even reaches 0x834 here
 // (1.2 lands 2008-2012, 2.0 1952, dsi 1764-1784), so the version axis is closed too.
 //
-// ALSO MEASURED INERT, wave 9 lane CRK-L (~5,300 more compiles, notes 6cf): 6cd dead
+// ALSO MEASURED INERT, wave 9 lane CRK-L (~5,300 more compiles, notes 6cq): 6cd dead
 // assignments in the loop preamble (130 cells, byte-identical objects every time); the 6cc
 // joint rank x type-name axis applied to the loop scratch after naming it (195 cells) and
 // two annealers over the same joint space, the second adding the five inner-scope locals'

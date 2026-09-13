@@ -1835,7 +1835,7 @@ RULES = [rule_empty, rule_ret_const, rule_ret_arg, rule_load, rule_load_mask,
 # reads CPP_FLAGS. Without it mwccarm threads exception cleanup through any function holding
 # an object with a destructor and the function's .text stops equalling the ROM's, so a correct
 # source reads NO-REPRO. See tools/match.py CPP_EXCEPTIONS_FLAG for the measured blast radius
-# (one row in 6,200) and notes/mwccarm-codegen.md 6cf.
+# (one row in 6,200) and notes/mwccarm-codegen.md 6co.
 CPP_FLAGS = M.DEFAULT_FLAGS.replace("-lang c99", "-lang c++") + " " + M.CPP_EXCEPTIONS_FLAG
 
 

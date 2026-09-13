@@ -878,7 +878,7 @@ class EvalPinGuardTests(unittest.TestCase):
         # plus the language flip plus `-Cpp_exceptions off`, so gating DEFAULT_FLAGS
         # gates everything the two lanes share; the one extra flag is deliberately not
         # in DEFAULT_FLAGS, and it is inert on all but one of the DB's //cpp rows
-        # (measured: tools/match.py CPP_EXCEPTIONS_FLAG, notes 6cf).
+        # (measured: tools/match.py CPP_EXCEPTIONS_FLAG, notes 6co).
         self.assertEqual(
             (pin.get("canonical"), pin.get("metric"), pin.get("flags")),
             (live["CANONICAL"], NDB.METRIC_REV, live["DEFAULT_FLAGS"]),

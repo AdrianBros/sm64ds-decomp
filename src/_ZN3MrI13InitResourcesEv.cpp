@@ -58,7 +58,7 @@
 // give the SAME 2. Every other installed build misses the size (1.2/sp3-sp4 0x290,
 // 2.0 0x288, dsi 0x27c).
 //
-// Re-measured 2026-09-13 (lane CRK-O) with the pragma sweep redone the way notes 6cf says
+// Re-measured 2026-09-13 (lane CRK-O) with the pragma sweep redone the way notes 6cj says
 // to run it, as a REPLACEMENT and not as an addition: 68 pragma names are accepted by
 // 2004/b56 and all 136 on/off cells score 3 at the exact size, so there is no narrow
 // pragma hiding here the way there was on func_ov015_021114f0. Also inert this pass:

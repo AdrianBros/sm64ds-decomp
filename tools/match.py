@@ -56,7 +56,7 @@ DEFAULT_FLAGS = ("-O4,p -enum int -lang c99 -char signed -interworking -proc arm
 # and tools/test_nearmiss_db.py::EvalPinGuardTests fails CI if it moves without a full
 # `nearmiss_db.py reeval`, which is lane-owned. See tools/build_pin.py (which derives its
 # flags from rombuild for the same reason), tools/swarm.py CPP_FLAGS, and
-# notes/mwccarm-codegen.md 6cf.
+# notes/mwccarm-codegen.md 6co.
 CPP_EXCEPTIONS_FLAG = "-Cpp_exceptions off"
 # The builds --all sweeps. This was a hand-written list of 12 while 25 mwccarm.exe were
 # installed, so `--all` ("sweep every known version") silently skipped 13 -- including
