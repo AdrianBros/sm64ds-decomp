@@ -18,7 +18,7 @@
 #
 #   1. NEEDS THE TOOLCHAIN. mwccarm and the extracted ROM are not on a GitHub runner;
 #      they live on the private build box pr-validate.yml relays to. Re-measured against
-#      8f554bce3 in a tree exported with `git archive origin/main` -- no `extracted/`, no
+#      5720933ba in a tree exported with `git archive origin/main` -- no `extracted/`, no
 #      `tools/mwccarm/`, no `tools/bin/`, which is exactly what this job's checkout is:
 #      test_objisolate skips ALL 34 of its tests (the older note here said 32; the suite
 #      grew), and test_check_src_tu_compiles FAILS 8. Wiring those would buy a green that
@@ -529,7 +529,7 @@ jobs:
 #                                      .rodata/.init/.ctor/.data/.bss/.exception/
 #                                      .exceptix. Comparing them
 #                                      refuses every real input, which is what made the
-#                                      whole path unreachable; 0b0e319 removed exactly
+#                                      whole path unreachable; 0b684dd removed exactly
 #                                      that comparison. Mutation-checked both ways:
 #                                      deleting the `sectionIndex` equality is caught by
 #                                      the new test, and restoring the section-name
