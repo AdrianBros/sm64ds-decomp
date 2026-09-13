@@ -36,7 +36,7 @@ class Tree:
     harvested rather than as a hard-coded list.
     """
 
-    def __init__(self, decl, src=None, types_h=None, **headers):
+    def __init__(self, decl, src=None, types_h=None, symbols=None, **headers):
         self.dir = tempfile.TemporaryDirectory()
         root = pathlib.Path(self.dir.name)
         (root / "include").mkdir()
@@ -49,6 +49,10 @@ class Tree:
             (root / "src").mkdir()
             for name, text in src.items():
                 (root / "src" / name).write_text(text, encoding="utf-8")
+        for name, text in (symbols or {}).items():
+            p = root / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding="utf-8")
         self.root = root
 
     def __enter__(self):
@@ -697,6 +701,32 @@ class ThePlainCHalfIsAdvisory(unittest.TestCase):
             _rows, cacct = t.check_c()
             self.assertEqual(macct["rows"], 1)   # only the _Z row
             self.assertEqual(cacct["rows"], 1)   # only the func_ row
+
+    def test_a_row_with_no_body_and_no_symbol_is_a_dead_row(self):
+        """112 rows on main are this: a name renamed away, the row left behind.
+
+        Split from the 5 that still name a real symbol, because one is a
+        cleanup and the other is a function nobody has recovered yet. Reporting
+        117 for both makes the check look 117 rows short of its reach when it
+        is 5.
+        """
+        with Tree("extern void func_01ffb0fc(void);\n"
+                  "extern void func_02010000(void);\n",
+                  symbols={"config/arm9/symbols.txt":
+                           "func_02010000 kind:function(arm,size=0x10)"
+                           " addr:0x02010000\n"}) as t:
+            _rows, acct = t.check_c()
+            self.assertEqual(acct["no_definition"], 2)
+            self.assertEqual(acct["dead_row"], 1)       # func_01ffb0fc
+            self.assertEqual(acct["unrecovered"], 1)    # func_02010000
+
+    def test_with_no_symbol_table_the_split_is_not_invented(self):
+        """A tree with no config/ reports the total and claims nothing more."""
+        with Tree("extern void func_01ffb0fc(void);\n") as t:
+            _rows, acct = t.check_c()
+            self.assertEqual(acct["no_definition"], 1)
+            self.assertEqual(acct["symbol_table"], 0)
+            self.assertEqual((acct["dead_row"], acct["unrecovered"]), (0, 0))
 
     def test_a_tree_with_no_src_is_not_an_error(self):
         """--root at a tree that has headers and no sources still runs."""

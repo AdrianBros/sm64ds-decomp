@@ -456,6 +456,26 @@ def definition_index(root):
     return out
 
 
+SYMBOL_ROW = re.compile(r"^(\S+) kind:function\(", re.M)
+
+
+def function_symbols(root):
+    """Every function name the config knows about, across all modules.
+
+    Only used to split the rows this check could not compare into two very
+    different things. A row with no definition in src/ but a real symbol record
+    is a function nobody has recovered yet; a row with neither is DEAD -- a name
+    that was renamed out of the tree with its declaration left behind. There are
+    112 of the second kind and 5 of the first, and reporting one number for both
+    makes the check look 117 rows short of its reach when it is 5.
+    """
+    out = set()
+    for f in sorted(root.glob("config/arm9/**/symbols.txt")):
+        out.update(SYMBOL_ROW.findall(
+            f.read_text(encoding="utf-8", errors="replace")))
+    return out
+
+
 def check_plain_c(root=REPO):
     """Return (rows, accounting) for the plain C func_* half.
 
@@ -465,9 +485,11 @@ def check_plain_c(root=REPO):
                           .read_text(encoding="utf-8", errors="replace"))
     aliases = scalar_aliases(root)
     index = definition_index(root)
+    symbols = function_symbols(root)
     rows = []
-    acct = {"rows": 0, "no_definition": 0,
-            "typedef_equivalent": 0, "asm_body": 0, "compared": 0}
+    acct = {"rows": 0, "no_definition": 0, "dead_row": 0, "unrecovered": 0,
+            "typedef_equivalent": 0, "asm_body": 0, "compared": 0,
+            "symbol_table": len(symbols)}
     for m in C_DECL_ROW.finditer(decl):
         dtype, sym = m.group(1).strip(), m.group(2)
         acct["rows"] += 1
@@ -476,8 +498,10 @@ def check_plain_c(root=REPO):
             # Either the row is stale -- src/engine/message/func_0201fe08.c is
             # the body, under the recovered name LoadMessageBankForLanguage --
             # or the function has no recovered source at all. Counted, not
-            # guessed at.
+            # guessed at, and split by whether the config still knows the name.
             acct["no_definition"] += 1
+            if symbols:
+                acct["unrecovered" if sym in symbols else "dead_row"] += 1
             continue
         path, btype = hit
         rel = path.relative_to(root).as_posix()
@@ -512,6 +536,11 @@ def report_plain_c(rows, acct, summary):
     if summary:
         print(f"\n  func_* rows in decl_common.h    {acct['rows']}")
         print(f"    no definition anywhere in src/   {acct['no_definition']}")
+        if acct["symbol_table"]:
+            print(f"      the name is still a symbol     {acct['unrecovered']}"
+                  "  (no recovered body yet)")
+            print(f"      the name is gone from config   {acct['dead_row']}"
+                  "  (DEAD ROW: renamed away, declaration left behind)")
         print(f"    COMPARED                         {acct['compared']}")
         print(f"      of those, hand-written asm     {acct['asm_body']}")
         print(f"      typedef-equivalent spellings   {acct['typedef_equivalent']}"
