@@ -16,6 +16,21 @@
 // byte-offset register and z<<9 through the freed array base, where mwccarm
 // coalesces both shifts into their own sources. Mechanism, the levers that are
 // measured-closed, and the one open angle: notes/mwccarm-codegen.md 6bn.
+//
+// Wave 9 lane CRK-L re-measured it and added ~1,200 compiles of NEW closed axes (notes 6cf,
+// which also shows this residue is the same shape as dScStarSel_c::Behavior's): the 6cc joint
+// declaration RANK x type NAME axis on a named `<< 9` intermediate (714 cells: x9 / z9 / both,
+// block A / B, 7 signed-32 spellings x 17 ranks) and on a per-block private set of
+// vx/vy/vz/sx/sz (238 cells) is completely FLAT at 4 -- 6bn had closed declaration ORDER with
+// natural types and type names at a fixed order, never the product; 6ce launders on the pool
+// and MMIO addresses (11 cells) are inert, there being no entry-block attractor pair here to
+// rotate; 6cd dead preamble assignments across the setup block and both loop preambles
+// (163 cells) are inert; and rewriting the shift as `* 512`, `(<<8)<<1`, `(<<1)<<8`,
+// `(*256)<<1`, `(<<8)*2` or `(v+v)<<8` per component per block (54 cells) is inert.
+// 6cf also names a candidate discriminator for 6bn's open block A / block B asymmetry: in
+// block A the ROM does not take the base register for the vertex load (`base` is still live
+// for block B) and both shifts coalesce in place; in block B `base` dies at that load, the ROM
+// coalesces vx into it, and the rotation is the tail of that coalesce chain.
 // Counts as decompiled, not matched.
 #include "types.h"
 
