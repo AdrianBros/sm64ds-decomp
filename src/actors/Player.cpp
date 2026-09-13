@@ -3706,7 +3706,7 @@ void func_ov002_020c2b08(void *arg0)
 // @symbol func_ov002_020c2db8
 extern "C" {
 void func_ov002_020c2db8(unsigned char* c) {
-    extern int func_ov002_020c14b8(void*);
+    extern void func_ov002_020c14b8(void*);
     extern int func_ov002_020c231c(void*);
     extern void func_02035798(void*, int);
     extern int func_ov002_020c25a8(void*, int);
@@ -3715,7 +3715,7 @@ void func_ov002_020c2db8(unsigned char* c) {
     extern int func_ov002_020c5d60(void*);
     extern int func_ov002_020c61ac(void*);
     extern int func_ov002_020eea84(void*, void*);
-    extern int func_ov002_020c2b08(void*);
+    extern void func_ov002_020c2b08(void*);
     extern int func_ov002_020c29d4(void*);
     extern void func_ov002_020c2db8(void*);
   func_ov002_020c14b8(c);
@@ -9675,7 +9675,7 @@ void func_ov002_020cb474(char* c){
 extern "C" {
 int Player::St_Climb_Cleanup()
 {
-    extern int func_ov002_020caf68(void*);
+    extern void func_ov002_020caf68(void*);
     extern int data_ov002_021106f4[];
     extern int data_ov002_021106dc[];
   int v = *(int*)((char*)&mRequestedState);
