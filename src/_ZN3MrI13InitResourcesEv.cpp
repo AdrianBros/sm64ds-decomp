@@ -3,8 +3,9 @@
 // NONMATCHING: 3/166 at exact size 0x298. (A lane draft briefly wrote 2 here and cited
 // the near-miss DB's shadow-struct row for the same address as agreeing. Re-measured
 // against 299660871, both give 3: this body 3/166, and that DB row 3/166 under its own
-// func_ov071_02121734 spelling, though the row still stores divergences: 2. The residue
-// listed just below is three slots and always was.)
+// func_ov071_02121734 spelling. The DB row itself stores divergences: 3, corrected on
+// 2026-09-12 by lane FLOORS; neither number needs changing. The residue listed just
+// below is three slots and always was.)
 //
 // The whole residue is a three-word rotation of the ModelBase::SetFile argument setup at
 // +0x20. The four setup instructions are the same multiset in the same registers; only
