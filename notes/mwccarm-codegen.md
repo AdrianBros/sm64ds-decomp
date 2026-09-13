@@ -4608,6 +4608,12 @@ shape-exact draft as a seed and move on. Conversely, if a near-miss has the ROM 
 dead register and your draft using a fresh one, the defect is yours and is worth chasing --
 that direction is the compiler's default and is always reachable.
 
+**Two later refinements, read them before applying this section.** 6cc's body recycles a
+just-died register twice inside one basic block, so check the ROM's own output for a recycle
+before banking a residue here. And the 6ce addendum measures the one case that does survive
+that check on a whole function: the INCOMING PARAMETER's register across its home
+instruction, where the escape hatch above also fails outright.
+
 ## 6bt. mwccarm's only ldm/stm path is the equal-width block move, so a 3-in / 4-out burst is not compiler output (func_02052514, 2026-09-05)
 
 `func_02052514` widens a 3x3 fx32 matrix to a 4x4 in three bursts:
@@ -5520,6 +5526,53 @@ off=r7`, this draft `i=r7 off=r4`) at +0x1c8/+0x1cc/+0x1d4/+0x1fc, seven `add r0
 sites, and +0x36c/+0x378. A fourth dead store at 21 more targets x 3 positions does not
 move it.
 
+### 6cd addendum: the lever is exhausted at three stores, and four neighbouring axes do not extend it (run link100 wave 9, lane CRK-A, 2026-09-13)
+
+The 13 words above were re-attacked from the banked div-13 source with the levers that
+landed the night before. Every axis below is flat: 1,400-odd compiles, not one cell under
+13, and the residue is still the same `i`/`off` pair swap. Reading the roles out of both
+loops explains why the two are hard to separate:
+
+```text
+    loop 1 (flag == 1)   n=r4  data=r5  off=r6  j=r7  row=r8  i=sl
+    loop 2 ROM           i=r4  n=r5     data=r6 off=r7 j=r8   row=sb  k842=fp
+    loop 2 this draft    off=r4 n=r5    data=r6 i=r7  j=r8    row=sb  k842=fp
+```
+
+Loop 2 is loop 1 shifted up one register with exactly one web wrapping back to r4. The ROM
+wraps `i`; every source shape we can reach wraps `off`. Nothing else in either loop differs.
+
+* **More dead stores do not help.** All six orders of the banked triple x 11 fourth-store
+  targets x 2 positions (126 cells) are 13, and so are all 136 PAIRS of fifth-and-sixth
+  stores in both orders (272 cells). The triple is a local optimum, not a step on a ladder.
+* **Position inside loop 1's preamble is flat, not just "loop 1 versus elsewhere".** The
+  triple as a block at all 7 slots of the preamble x all 6 internal orders, plus the three
+  stores SPREAD one per slot (343 more cells), all score 13. 6cd's "position is load-bearing"
+  holds between loops, not within the preamble.
+* **Three further positions are inert too**: ahead of `if (flag == 1)`, at the top of loop
+  1's body, and at the end of loop 1's body before the increments (13 targets each, 39 cells).
+* **6cc's joint rank x type-name axis does not grip this body.** 360 cells of
+  rank(`i`) x rank(`off`) x {int, long} x {int, long} are all 13; a hill climb over the whole
+  ten-local declaration list whose neighbourhood contains both move kinds (450 evaluations,
+  three restarts, 6 type names per local where they are semantics-preserving) exhausts the
+  single-move neighbourhood of the div-13 point and re-converges to 13 from two random
+  starts. Compare 6cc's own body, where the same neighbourhood moved 19 to 11: the
+  difference is that `i` and `off` are both loop-carried webs whose ranges nest, so the
+  declaration list has nothing left to order.
+* **6cb's block-depth axis is live here and points the wrong way.** Shadowing `off` alone
+  in a block around loop 2 holds at 13; shadowing `i`, or `i` and `off` together, costs 31;
+  adding `j` costs 40 and adding `row` 50 (41 cells). Block depth does reach these webs,
+  which is worth knowing, but every cell it reaches is worse. Shadowing also defeats 6cd
+  itself, because the lever needs loop 1 and loop 2 to name the SAME variables.
+* **The full 246-name pragma vocabulary at on and off, stacked on the file's own
+  `opt_strength_reduction off` (490 cells), produces no cell below 13.** Only four names
+  change the colouring at all and all four are worse: `opt_loop_invariants off` 31,
+  `opt_lifetimes off` 64, `opt_dead_assignments off` 92, `opt_propagation off` 97. The third
+  of those is the lever's own mechanism seen from the other side: with dead-assignment
+  elimination off the three stores are emitted and the body loses 79 words.
+* **The permuter, 90 minutes at -j4 on the div-13 base, 6,800 candidates, never beat the
+  base score of 70.**
+
 ## 6ce. A launder on a pool address picks which of two entry-block attractors wins the switch selector's register (func_ov063_02117cdc, div 3, 2026-09-12, run link100 lane DCHEAP)
 
 `func_ov063_02117cdc` (ov063 0x02117cdc, 0x77c) closed 9 -> 3 by folding case 9's
@@ -5543,6 +5596,64 @@ register in the function by one (div 179), so it is not a usable lever here. Als
 8 selector-expression forms, 8 folded-address-temp forms, 20 pragmas, 24 top-level
 declaration orders, a named-local parameter alias (the `dScMgAmida_c::Behavior` shape),
 and C++ language mode.
+
+### 6ce addendum: the basin is wide, six more axes are inert, and this body falsifies 6bs's blanket rule (run link100 wave 9, lane CRK-A, 2026-09-13)
+
+Re-attacked from the banked div-3 source. The three words are still the whole residue and
+still the switch selector alone:
+
+```text
+    +0x0c   ROM  ldrb  r2,[r6,#0x5ce]     draft  ldrb  r0,[r6,#0x5ce]
+    +0x18   ROM  cmp   r2,#0xa            draft  cmp   r0,#0xa
+    +0x1c   ROM  addls pc,pc,r2,lsl #2    draft  addls pc,pc,r0,lsl #2
+```
+
+**The two attractors are a wide basin, not a narrow spelling.** 20 spellings of the
+`data_0209f318` read (plain, `&`, array-of-pointer, `char *`, `int`/`u32`/`long` casts, a
+struct member, a pointer temp, a double launder, a const-qualified read, an indexed launder)
+crossed with 3 selector forms, 60 cells: every valid cell lands on exactly one of two values
+and nothing lies between or below them. Ten spellings reach the laundered attractor at 3
+(pool r1, selector r0) and ten reach the plain one at 5 (pool r0, selector r1).
+
+**Four more axes, 700-odd cells, all flat at 3.**
+
+* **6cd's dead assignments do not apply here.** 20 statements x 2 positions in the entry
+  block: every scalar target is byte-for-byte unchanged, every stack-array target grows the
+  body. This is 6cc's "an unused local is invisible" negative in a second place, and it
+  sharpens 6cd: that lever needs a variable ALREADY live later whose range is being
+  extended, and this entry block has no such variable to reach for.
+* **Naming the selector gives it no rank.** `T sel; sel = arg0[0x5ce]; switch (sel)` over 14
+  type names x 5 declaration ranks x 2 assignment positions, 140 cells, every size-preserving
+  one at 3 (`char` and `signed char` sign-extend and change the compare). The selector is a
+  compiler temp and 6cc's stated bound applies: the joint rank x type axis has nothing to grip.
+* **Parameter arity and qualifiers are inert**: one to four parameters, `register`,
+  `u8 *const`, 9 cells, all 3. An unused extra parameter does not reserve its register, so
+  it cannot be used to push the selector up.
+* **The full 246-name pragma vocabulary at on and off, 492 cells, produces nothing below 3**,
+  and all 25 installed builds were swept: `MATCHING VERSIONS: none` (1.2/base, 1.2/sp2 and
+  1.2/sp2p3 also give the same 3 words; every 2.0 and dsi build changes the body).
+* **The permuter, 90 minutes at -j3, 3,800 candidates, never beat the base score of 15.**
+
+**What this body says about 6bs.** 6cc asks for a check before banking a regperm residue as
+the "does not recycle a just-died register" build delta: look at the ROM's own output for a
+recycle. This function has one, and the draft reproduces it byte for byte:
+
+```text
+    +0xbc   ldr  r0,[pc,#0x680]      r0 = the 0x5ce field offset
+    +0xc4   add  r1,r6,r0            r0's last use, it dies here
+    +0xc8   ldrb r0,[r1]             r0 taken again one instruction later
+```
+
+So the blanket rule is false on this body. What the ROM reserves is narrower and worth
+stating separately: the INCOMING PARAMETER's register across its home instruction. Both
+entry-block webs skip r0 after `mov r6,r0` at +0x08, and no local temp anywhere else in the
+function skips anything. Under mwccarm the parameter's web dies at the home and both webs
+are free to take r0, which is why the two attractors are {r0,r1} in either order and the
+ROM's {r1,r2} is not reachable from a third spelling. Treat this as the parameter-home case
+of 6bs rather than as 6bs itself, and do not spend a lane on the general rule's escape
+hatches. 6bs's own escape was measured here and fails twice over: a `volatile int zz;` fed
+into a separate named local grows the frame from 0x1c to 0x24, emits the store and the
+reload, moves 246 of 479 words, AND STILL LEAVES THE SELECTOR IN r0.
 
 ## 6cb. Block DEPTH of a named web is a rank lever that declaration ORDER is not, and the operand order of a `+` decides which side owns the shifter-operand register (func_ov075_0211621c, div 27 -> 0, 2026-09-12, run link100 lane OV75)
 
