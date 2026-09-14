@@ -19601,10 +19601,12 @@
   },
   "func_ov098_0213a2cc": {
    "src/game/actors/d_a_obj_bk_fall_block.cpp": ["param:#1 daObjBk_Fall_Block_c *", "param:#2 ResourceDescriptor *"],
+   "src/game/actors/d_a_obj_th_fall_block.cpp": ["param:#1 daObjTh_Fall_Block_c *", "param:#2 ResourceDescriptor *"],
    "src/game/actors/daObjFl_Fall_Block_c.cpp": ["param:#1 daObjFl_Fall_Block_c *", "param:#2 ResourceDescriptor *"]
   },
   "func_ov098_0213a794": {
    "src/game/actors/d_a_obj_bk_fall_block.cpp": ["param:#1 daObjBk_Fall_Block_c *", "param:#2 ResourceDescriptor *"],
+   "src/game/actors/d_a_obj_th_fall_block.cpp": ["param:#1 daObjTh_Fall_Block_c *", "param:#2 ResourceDescriptor *"],
    "src/game/actors/daObjFl_Fall_Block_c.cpp": ["param:#1 daObjFl_Fall_Block_c *", "param:#2 ResourceDescriptor *"]
   },
   "func_ov098_0213a8e0": {
