@@ -15,16 +15,20 @@ typedef struct
   int y;
   int z;
 } Vec3;
-extern int data_020a0e68[12];
-extern int data_0209b3ec[12];
+struct Matrix4x3;
+typedef struct Matrix4x3 Matrix4x3;
+struct Mtx43;
+typedef struct Mtx43 Mtx43;
+extern Matrix4x3 data_020a0e68;
+extern Matrix4x3 data_0209b3ec;
 extern unsigned short data_ov006_0212e060[];
 extern unsigned short data_ov006_0212e068[];
 extern int data_ov006_0212e0b0[];
-extern unsigned int data_ov006_02140844;
-extern unsigned int data_ov006_02140814;
-extern void Matrix4x3_FromTranslation(int *m, int x, int y, int z);
-extern void MulMat4x3Mat4x3(int *a, int *b, int *dst);
-extern void Matrix4x3_ApplyInPlaceToScale(int *m, int x, int y, int z);
+extern void *data_ov006_02140844;
+extern void *data_ov006_02140814;
+extern void Matrix4x3_FromTranslation(Mtx43 *m, int x, int y, int z);
+extern void MulMat4x3Mat4x3(const int *a, const int *b, int *dst);
+extern void Matrix4x3_ApplyInPlaceToScale(Matrix4x3 *m, int x, int y, int z);
 extern void func_020553a4(int *m);
 void func_ov006_020cf2fc(char *obj)
 {
@@ -36,10 +40,10 @@ void func_ov006_020cf2fc(char *obj)
   int zero2;
   int m2[12];
   int m1[12];
-  Matrix4x3_FromTranslation(data_020a0e68, *((int *) (obj + 8)), *((int *) (obj + 0xc)), *((int *) (obj + 0x10)));
-  MulMat4x3Mat4x3(data_020a0e68, data_0209b3ec, m1);
-  Matrix4x3_ApplyInPlaceToScale(data_020a0e68, *((int *) (obj + 0x2c)), *((int *) (obj + 0x30)), *((int *) (obj + 0x34)));
-  MulMat4x3Mat4x3(data_020a0e68, data_0209b3ec, m2);
+  Matrix4x3_FromTranslation((Mtx43 *) &data_020a0e68, *((int *) (obj + 8)), *((int *) (obj + 0xc)), *((int *) (obj + 0x10)));
+  MulMat4x3Mat4x3((const int *) &data_020a0e68, (const int *) &data_0209b3ec, m1);
+  Matrix4x3_ApplyInPlaceToScale(&data_020a0e68, *((int *) (obj + 0x2c)), *((int *) (obj + 0x30)), *((int *) (obj + 0x34)));
+  MulMat4x3Mat4x3((const int *) &data_020a0e68, (const int *) &data_0209b3ec, m2);
   *((vu32 *) 0x4000440) = 2;
   func_020553a4(m1);
   *((vu32 *) 0x4000440) = 1;
@@ -53,8 +57,8 @@ void func_ov006_020cf2fc(char *obj)
     *((vu32 *) 0x4000454) = z;
     i = z;
   }
-  *((vu32 *) 0x40004a8) = 0x8da70000 | (data_ov006_02140844 >> 3);
-  *((vu32 *) 0x40004ac) = data_ov006_02140814 >> 4;
+  *((vu32 *) 0x40004a8) = 0x8da70000 | (((unsigned int) data_ov006_02140844) >> 3);
+  *((vu32 *) 0x40004ac) = ((unsigned int) data_ov006_02140814) >> 4;
   {
     short *p31e = (short *) (obj + 0x31e);
     int sh = *p31e;
