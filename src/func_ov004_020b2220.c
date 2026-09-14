@@ -14,7 +14,7 @@ typedef short s16;
 struct M { int _00, _01, _10, _11; };
 extern void func_ov004_020b1c68(void* a0, int a1, int a2, int a3, int a4, struct M* a5);
 extern s16 data_02082214[];
-extern void* data_ov006_02137cd8[];
+extern int data_ov006_02137cd8[];
 #pragma opt_propagation off
 void func_ov004_020b2220(int sl, int sb, int value, int r7, int r6, int fix, u16 angle)
 {
@@ -34,17 +34,17 @@ void func_ov004_020b2220(int sl, int sb, int value, int r7, int r6, int fix, u16
     m._10 = -m._01;
     m._11 = m._00;
     if (th != 0) {
-        func_ov004_020b1c68(data_ov006_02137cd8[th], sl - 0x30, sb, r7, r6, &m);
-        func_ov004_020b1c68(data_ov006_02137cd8[hu], sl - 0x10, sb, r7, r6, &m);
-        func_ov004_020b1c68(data_ov006_02137cd8[te], sl + 0x10, sb, r7, r6, &m);
+        func_ov004_020b1c68((void *) data_ov006_02137cd8[th], sl - 0x30, sb, r7, r6, &m);
+        func_ov004_020b1c68((void *) data_ov006_02137cd8[hu], sl - 0x10, sb, r7, r6, &m);
+        func_ov004_020b1c68((void *) data_ov006_02137cd8[te], sl + 0x10, sb, r7, r6, &m);
         sl += 0x30;
     } else if (hu != 0) {
-        func_ov004_020b1c68(data_ov006_02137cd8[hu], sl - 0x20, sb, r7, r6, &m);
-        func_ov004_020b1c68(data_ov006_02137cd8[te], sl, sb, r7, r6, &m);
+        func_ov004_020b1c68((void *) data_ov006_02137cd8[hu], sl - 0x20, sb, r7, r6, &m);
+        func_ov004_020b1c68((void *) data_ov006_02137cd8[te], sl, sb, r7, r6, &m);
         sl += 0x20;
     } else if (te != 0) {
-        func_ov004_020b1c68(data_ov006_02137cd8[te], sl - 0x10, sb, r7, r6, &m);
+        func_ov004_020b1c68((void *) data_ov006_02137cd8[te], sl - 0x10, sb, r7, r6, &m);
         sl += 0x10;
     }
-    func_ov004_020b1c68(data_ov006_02137cd8[value], sl, sb, r7, r6, &m);
+    func_ov004_020b1c68((void *) data_ov006_02137cd8[value], sl, sb, r7, r6, &m);
 }
