@@ -3434,6 +3434,10 @@ src/_ZN3OAM11GetObjWidthEii.cpp:
     complete
     .text start:0x02020980 end:0x02020994
 
+src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiES3_ii.c:
+    complete
+    .text start:0x02020994 end:0x02021024
+
 src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiEi.c:
     complete
     .text start:0x02021024 end:0x020214a4
