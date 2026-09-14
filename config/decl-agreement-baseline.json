@@ -10836,6 +10836,9 @@
    "src/__sinit_ov062_0211d6fc.c": ["return:S8 []"],
    "src/func_ov062_0211bd10.c": ["return:void *"]
   },
+  "data_ov063_0211eb10": {
+   "src/game/actors/d_a_obj_th_fall_block.cpp": ["return:ResourceDescriptor"]
+  },
   "data_ov063_0211edc4": {
    "src/game/actors/daTrs_c/_ZN7daTrs_c16CleanupResourcesEv.cpp": ["return:SharedFilePtr"]
   },
