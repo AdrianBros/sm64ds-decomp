@@ -39,7 +39,40 @@ the span containing the address:
 The old `[N] address file` header tables are the TU manifest rows:
 `ordinal` + `address` + `legacy_source` per function, e.g.
 [ov002/daTree_c.json](../config/tu_manifest.d/ov002/daTree_c.json).
-The resync gate keeps compiler-numbered symbols in these rows honest.
+Where a TU has no manifest yet, the ordinal is the function's position
+in ROM-address order (see below). The resync gate keeps
+compiler-numbered symbols in these rows honest.
+
+## Function address and size
+
+`symbols.txt` carries one row per function with its size, so the old
+per-function `name, address, size` banners are a grep away:
+
+    grep "_ZN8daTree_c6RenderEv" config/arm9/overlays/ov002/symbols.txt
+
+## Key function and vague linkage
+
+Which TU emits a class's `_ZTV`/`_ZTI`/`_ZTS` group, and why, is
+recorded in that TU's manifest notes (key-function selection,
+vague-linkage reason per row, deadstrip proofs) — e.g. the notes in
+[ov002/daTree_c.json](../config/tu_manifest.d/ov002/daTree_c.json).
+Where the answer constrains future edits, a one-liner stays in the
+header next to the key function; the essay lives in the manifest.
+
+## Which names to trust
+
+Real RTTI-proven names versus reconstructions:
+[symbol-name-provenance.md](symbol-name-provenance.md) for the system,
+the TU manifest's notes for the per-class verdict (including coined
+predecessors), and
+[rom-name-glossary.json](../config/rom-name-glossary.json) for what
+the Japanese names mean and how confident each reading is.
+
+## Logbook banners
+
+`/* recovered: ... */` banners are deliberately preserved nowhere:
+they narrated the recovery pass, and every fact in them is visible in
+the code they sat on.
 
 ## VTables, RTTI, type strings
 
