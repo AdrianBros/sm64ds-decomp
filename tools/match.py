@@ -22,6 +22,7 @@ import pathlib
 import subprocess
 import tempfile
 import os
+import shutil
 
 from elftools.elf.elffile import ELFFile
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM
@@ -124,6 +125,14 @@ def compile_c(cfile: pathlib.Path, version: str, flags: str,
     # container corpus link-checks are identical.) This lives here so the build box can run
     # stock repo tooling instead of a hand-patched fork of match.py.
     launcher = os.environ.get("MWCCARM_LAUNCHER", "").split()
+    if not launcher and os.name != "nt" and shutil.which("wine"):
+        # The variable is the worker's to set, and the worker sets it for rombuild.py and
+        # pr_linkcheck.py but not for validate_merge.py, whose _compiled_code_reader lands
+        # here whenever a PR touches symbols.txt (#2496: "Exec format error" on the PE).
+        # A Windows executable cannot run natively on a non-Windows host, so with Wine on
+        # PATH and no launcher named, Wine is the only thing that can be meant. Native
+        # Windows is untouched: os.name == "nt" never enters this branch.
+        launcher = ["wine"]
     with tempfile.TemporaryDirectory() as td:
         out_o = pathlib.Path(td) / "out.o"
         env = dict(os.environ, LM_LICENSE_FILE=str(LICENSE))
