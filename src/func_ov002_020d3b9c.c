@@ -16,14 +16,14 @@ typedef unsigned short u16;
 typedef int s32;
 typedef unsigned int u32;
 extern int Player_ScaleByCharFactor(void *c, int a);
-extern int func_ov002_020bf224(void *c, int a, int b);
+extern int func_ov002_020bf224(int c, int a, int b);
 extern int func_ov002_020bf56c(void *c, int b);
 extern void func_ov002_020bf88c(void *c);
 extern int func_ov002_020c031c(void *c);
 extern int func_ov002_020f035c(unsigned int sel, int r1);
 extern int AngleDiff(int a, int b);
 extern int __aeabi_idiv(int a, int b);
-extern void ApproachAngle(short *cur, short target, int divisor, int band, int maxStep);
+extern int ApproachAngle(short *cur, short target, int divisor, int band, int maxStep);
 extern void _ZN6Player11ChangeStateERNS_5StateE(void *c, void *s);
 extern void Player_AdvanceAnims(void *c);
 extern void func_ov002_020d4540(void *c);
@@ -33,9 +33,9 @@ extern void func_ov002_020c18b0(void *c, int a);
 extern unsigned char data_020a0e40;
 extern short data_0209f4a0[];
 extern char data_0209f49c[];
-extern char data_0209f4ac[];
-extern char data_0209f4ae[];
-extern int data_ov002_02110184[];
+extern unsigned char data_0209f4ac[];
+extern unsigned char data_0209f4ae[];
+extern char data_ov002_02110184;
 int func_ov002_020d3b9c(char *c)
 {
   int acc;
@@ -89,7 +89,7 @@ int func_ov002_020d3b9c(char *c)
       {
         int a = Player_ScaleByCharFactor(c, 0x28000);
         int b = Player_ScaleByCharFactor(c, 0xa000);
-        spd = func_ov002_020bf224(c, a, b);
+        spd = func_ov002_020bf224((int) c, a, b);
       }
       acc = 0x1000;
       if ((*((s16 *) (((char *) data_0209f4a0) + (data_020a0e40 * 0x18)))) >= 0xf00)
@@ -157,7 +157,7 @@ int func_ov002_020d3b9c(char *c)
       int cur = *((int *) (c + 0x98));
       if ((cur >= Player_ScaleByCharFactor(c, 0x1c000)) && ((*((u8 *) (c + 0x703))) == 0))
       {
-        _ZN6Player11ChangeStateERNS_5StateE(c, data_ov002_02110184);
+        _ZN6Player11ChangeStateERNS_5StateE(c, &data_ov002_02110184);
         Player_AdvanceAnims(c);
         return 1;
       }
