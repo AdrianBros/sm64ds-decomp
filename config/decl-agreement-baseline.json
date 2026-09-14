@@ -10856,7 +10856,6 @@
    "src/unnamed/ov063/__sinit_ov063_0211e29c.c": ["return:char []"]
   },
   "data_ov063_0211edec": {
-   "src/game/actors/daTBasket_c/_ZN11daTBasket_c13InitResourcesEv.cpp": ["return:void *"],
    "src/unnamed/ov063/__sinit_ov063_0211e29c.c": ["return:char []"]
   },
   "data_ov063_0211edf4": {
