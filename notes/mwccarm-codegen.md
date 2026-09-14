@@ -5668,6 +5668,16 @@ hatches. 6bs's own escape was measured here and fails twice over: a `volatile in
 into a separate named local grows the frame from 0x1c to 0x24, emits the store and the
 reload, moves 246 of 479 words, AND STILL LEAVES THE SELECTOR IN r0.
 
+### 6ce addendum 2: CLOSED, and the "parameter-home reservation" was a dropped `this` argument (run link100 wave 12, lane W12-1, 2026-09-13)
+
+The ROM's colouring (pool r1, selector r2, r0 untouched) is reachable: case 0 calls
+`dActor_c::ClosestPlayer()`, a method whose `this` is the function's own parameter, and the
+draft had declared it `(void)`. Declared and called with the parameter, the parameter's r0 web
+stays live from the entry into case 0 and both entry-block temps skip it: div 0 with the plain
+pool address, no launder needed. The r0 skip above is a liveness fact about the callee, not a
+rule of the ROM's compiler. Section 6cx carries the match, the 69-function oracle scan and the
+check to run before calling an entry-block colouring a floor.
+
 ## 6cb. Block DEPTH of a named web is a rank lever that declaration ORDER is not, and the operand order of a `+` decides which side owns the shifter-operand register (func_ov075_0211621c, div 27 -> 0, 2026-09-12, run link100 lane OV75)
 
 `func_ov075_0211621c` (ov075, 0x394) draws the VS entry menu's per-player score rows.
@@ -7008,3 +7018,425 @@ refuse it and should. RECOMMENDATION, accepted by the coordinator: stop re-queue
 It needs the ROM's own compiler (CW NITRO V0.6.1, 6ah, unarchived) or a construct 6bs says
 does not exist.
 
+
+### 6cs addendum: the residue is an ISSUE-ORDER decision at identical allocation and identical pressure, and the 6ct receiver class is empty here (run link100 wave 12, lane W12-2, 2026-09-13)
+
+Re-read with a word-shifted side-by-side, the three-temp candidate (cf_BL1) already gives loop 1's
+vertex temps the ROM's registers (z=sb, x=sl, y=ip). The ROM's own rule at all three emit sites is
+"z first, then x, then y, each the lowest free register" (loop 2: z=r1 x=r3 y=sl, then z=r0 x=r1
+y=r3), and the ROM recycles just-freed registers there (`str r3,[r1]` then `ldr r3,[r8]`), so the
+6bs skip rule above is not what separates the two compilers. What differs is only the order the
+three loads are ISSUED: the ROM issues x, y, z and interleaves the chains with z one step behind;
+2004/b56 issues z, then x, runs each chain to its end, and issues y last. Three controls bound it:
+
+* b56's loop 2 in the same file interleaves like the ROM although z's register (r1) was freed by
+  the immediately preceding store, so "hoist the load whose destination was just freed" is wrong.
+* CRK2-J's uninitialised-read control reaches the ROM's loop-1 order with the SAME pressure (11
+  pinned, 3 free) and the same temp pattern (z=r8 x=sl y=ip after `str sl,[r8]`), so the number of
+  free registers is not the trigger either.
+* The "register-exact" claim above was also short on the scalars: ROM i4=r3 n=r2 k=r4 na=r6 vb=r7
+  va=r8 against cf_BL1's i4=r8 n=r4 k=r2 na=r3 vb=r6 va=r7, and 30 cells of 6cd dead defs (entry
+  block and preheader) and 6cc type names on those scalars leave both the role map and the emit
+  order unchanged.
+
+6ct's receiver lever has nothing to grip in this loop: every register-resident local is live across
+the window (the loop-carried n, i4, k; the four post-increment pointers; the four pinned addresses),
+i, j, k0 and prim are stack slots, and neither loop has an entry guard (both are bottom-tested).
+The created-receiver spellings (z or x held in a function-scope local, the NRM value in a named
+local, the k0/prim preheader form) fold back or cost a frame slot (285 words, 0x84). Array-indexed
+source forms with strength reduction on or off are not the ROM's shape (a mul per access, or 288+
+words). Verdict unchanged: a compiler-side scheduling difference; the stored 164 stands.
+
+## 6ct. A value assigned to a variable the optimiser will not propagate gets its own colour, and that is the handle 6cq said did not exist: func_ov075_0211afb0 MATCHED (div 4 -> 0, 2026-09-13, run link100 wave 11 lane WALL-B)
+
+`func_ov075_0211afb0` (ov075 0x0211afb0, 0x21c) sat at four words for three campaigns
+(6bm, 6bn, 6cq: ~260,000 compiles, five permuter seeds, the full pragma vocabulary, every
+declaration rank x type name product, 840 statement orders, 25 builds). The residue was one
+colouring decision in the second vertex emission: the ROM emits `lsl sb,r0,#9` where every
+build we own emits `lsl r0,r0,#9`, because 2004/b56 puts `vx << 9` into the register of `vx`,
+which dies at that instruction, and the ROM's compiler takes the register freed one
+instruction earlier. It is byte-exact now, under the build's own flags, with two spellings
+inside the emission block and nothing else changed:
+
+```c
+                    vx = *(int *)(base + off1);
+                    sz = *(int *)(p1 + 8);      /* z loaded INTO the destination local */
+                    cols = vx << 9;             /* x << 9 parked in the loop bound      */
+                    sx = cols >> 16;
+                    sz = (sz << 9) >> 16;       /* and shifted in place                */
+```
+
+`cols` is the inner loop's bound, reloaded from `self[0xa7]` at the loop tail before its
+next use, so parking a value in it between the two is semantically free. Both emissions
+are spelt the same way (the symmetric form matches as well as the block-B-only form).
+
+**The mechanism, measured.** Assigning `vx << 9` to a variable does nothing when the
+variable is a plain local: the optimiser propagates it into the expression and the shift
+result coalesces in place with `vx` (6cq's 714 named-intermediate cells; here: fresh
+`x9` at any rank, `register int x9`, `sx = (x9 = vx << 9) >> 16`, a comma form, a
+struct or union member local, a one-element array, a `static inline` helper by pointer,
+`do { } while (0)`, an outer-preamble dead def, an extra dead parameter, a C++ member
+function storing into a member, a ctor local, a scoped dtor local, an `int &` to a local:
+31 cells, and not one gives the shift its own register -- the size-exact ones all emit
+`lsl r0,r0,#9`, the rest break the size or the schedule). Assigning it to `cols` gives it a separate web,
+coloured `sb` (the only free register at that point), and with `x << 9` out of the way
+2004/b56 also stops coalescing `sz <- z9` and `sx <- x9` and colours those two words the
+ROM's way. The remaining half was the two loads, `vx` r5 / `vz` r0 against the ROM's
+r0 / r5, and loading z straight into `sz` (the local the result lands in) flips them.
+
+What makes `cols` special is NOT that it is loop-carried, reloaded at the tail, or compared
+in the loop condition. A fresh `k` given every one of those properties (assigned from the
+same load at the outer head, used at the inner head, reloaded at the tail, `while (j < k)`)
+stays propagated. The property that matters is the OUTER GUARD: `cols` is the value tested
+in `if (cols > 0)` before the inner loop, and its web crosses that branch into the loop.
+Reading the guard from memory instead (`if (*(u8 *)(self + 0xa7) > 0)`) or dropping the
+head use while keeping the guard tells the two apart: guard gone, effect gone (div 5,
+shipped window); head use gone, guard kept, effect kept. Renaming `cols` to `k` everywhere
+keeps it (rename-invariant). So the lever, stated generally: **a value the ROM keeps in a
+fresh register where 2004/b56 recycles the dying operand can be given its own colour by
+assigning it to a local whose live range already crosses a conditional branch out of the
+enclosing block** -- a variable the propagation pass treats as global. That is exactly the
+class 6cq named on both group-c floors (dScStarSel_c::Behavior's +0x248 `ty` web is the
+other instance) and declared out of source reach.
+
+**Measured this session (all compiled with build_pin.flags_for, scored word-for-word):**
+
+| family | cells | result |
+|---|---|---|
+| plain C++ port (`//cpp`, `extern "C"`, `-Cpp_exceptions off`) | 1 | div 4, byte-identical to C |
+| variable reuse as the shift's destination: off0, off1, p0, p1, base (char* and int forms), cols, vx, the ROM-colour chain | 15 | only `cols` moves it (div 4, win 2, +0x164 `lsl sb,r5,#9`); off1/base reuse recolours the whole function (div 54-66) |
+| around the cols cell: source order of the loads, z9 receivers, vx inline, both blocks, decl rank/type of cols/vx/vz, `register`, `int &`, the C++ port | 39 | all div 4 win 2, same window |
+| non-propagation probes for a fresh receiver (C and C++ constructs above) | 23+8 | none escapes |
+| which property of cols matters (guard / head / tail / carried / copy) | 10 | guard use is necessary; head use is not |
+| statement-order linear extensions of block B in the cols regime | 80 | 42 at the cols window, 18 at the shipped window, 20 at div 28; none better |
+| z9 receivers in the cols regime | 12 | `sz` holding the load: **div 0** |
+| cleaner spellings of the match | 11 | symmetric both-block form, C++ form, `vz = sz << 9` form all div 0; dropping `cols` (both loads held in sx/sz) div 12; z-hold without cols div 4 |
+
+Roughly 200 compiles. The whole search that mattered was `cols` (15 cells in) and `sz` (12
+cells after that); everything else here is the negative space that says why nothing
+earlier reached it.
+
+**How to apply.** On a regperm residue where the ROM refuses a dying operand's register
+(6bs/6cq shape), before banking it as a build delta: list the function's locals whose live
+range crosses a branch out of the block (loop bounds tested in a guard, values compared
+before a loop), find one that is dead across the window, and assign the new value to it.
+Then hold the OTHER chain's load in its own destination local. Score the window by offset,
+as always. The permuter cannot find this (its mutations do not reassign to existing locals
+across a guard) and neither can a rank x type sweep (the receiver has to be an existing
+global-ish web, not a fresh name).
+
+### 6ct addendum: two rows where the receiver reproduces the ROM's colouring, or has nothing to grip, and the row does not close (run link100 wave 12, lane W12-4, 2026-09-13)
+
+`_ZN6Player19St_SwingPlayer_MainEv` (ov002 0x020d9fec, 0x3c4; stored 8, stands). Roles in
++0x11c..+0x178, ROM / ours: `av` (the loaded angular speed) ip / r3; `diff` (the s16
+difference, the `asr` at +0x138) r3 / r1; `step` (the shifted value at +0x150 and +0x158)
+r3 / r3. In the ROM `diff` and `step` are ONE web across the if-converted arms (the lt arm
+writes r3 at +0x150 and the ge arm reads the old `diff` from r3 at +0x154); 2004/b56 splits
+an int reassigned in both arms of an if/else or a ternary into two webs, colours the new one
+lowest-free (r3, same as the ROM) and the old one against only the r0 temps and `av` (r1),
+with `av` coloured first (r3). Two spellings together give every register in that window the
+ROM's: `av` held in the guard-crossing `stick` (or in the index `n`), which is this section's
+lever verbatim, AND `diff` written as two ifs (`if (av < 0x800) diff = A; if (av >= 0x800)
+diff = B;`), the one phi-connected spelling that keeps a single web. The cost is the second
+`cmp` re-emitted: 968 bytes against 964, `fdiff --align` INSERT `cmp ip,#0x800`. The
+receiver alone does nothing on the split base (the old web still takes r1). Inert on the
+two-if base: declaration rank x type name of the two webs (48), 26 phi spellings (else-if,
+goto, switch, bool temps, subtraction into flags, while/do breaks: 964/8 split or 972+ with a
+branch), 7 type families for `diff` (bitfield, pointer, enum, bool, reference), s16 in-place
+forms (one web but a narrowing pair, 968 to 980), 6cd dead uses of the arms' values (30,
+byte-identical: dead-assignment elimination runs before allocation here), 246 pragmas at on
+and off (492 cells; `optimize_for_size` merges the early epilogue and keeps the cmp), and all
+25 builds (`MATCHING VERSIONS: none`). Corpus check (11,332 matched functions): 2004/b56 does
+give a phi web the register of an input that dies in each arm (`func_ov002_020d9c70` +0xa4,
+`func_0206c8b4` +0x30), so it allocates before if-conversion with predicate-aware liveness
+and the two webs COULD share r3; only a one-web spelling gives the old web the r1/r2 conflicts
+that push it there. Residue: the SSA split of a two-arm int reassignment. 186 hand cells, 492
+pragma cells, 25 builds; no seed (nothing size-exact below 8).
+
+`func_ov002_020f3de4` (ov002 0x020f3de4, 0x318; stored 44, stands). Both clusters are the
+6ce addendum's parameter-home class. Cluster A (+0x18..+0x48): ROM `v` r1, address temp r2,
+`v - 1` r0 with r0 first touched at +0x28; ours address r1, `v` r0, taken at +0x1c two
+instructions after the home. Cluster B (+0x1dc..+0x27c): on the `phase != 0` path the ROM
+never uses r0 between the home at +0x14 and the call at +0x280; ours takes r0 at +0x1e4 and
++0x22c and the path's temps rotate down with it (`ang` r3 against r7, `tbl` r2 against r1,
+0x800 r3 against ip, the smull low word ip against sb). 2004/b56 skips r0 for exactly one
+allocation after the home (+0x18 to r1) and one after the phase compare (+0x1dc to r1), then
+takes it. The receiver lever has nothing to grip: no guard-crossing local could sit in r0
+across that path without an instruction, and the struct and raw forms of the body are
+byte-identical. Cells: `v` reused for the phase load (u16 / int / u8), the phase named, the
+decrement into `v`, `v` for phase and `ang` (a reassignment is a new web; 6 cells, all 44); an
+early entry pointer for the y store (752, the add moves up); the parameters copied into locals
+(coalesced, 44); the timer guard inline or `--` (744, addressing change); `c` used after the
+call (808). 13 cells, no seed. Not tried on this body: 6cx's check, a callee on the phase path
+whose declared arity is short of what the ROM's call site passes in r0, which is the one
+mechanism that has made this class move.
+
+## 6cu. A dead initialiser in the ENTRY block pulls a loop-carried variable to the FRONT of a later loop's colouring order, and only then does 6cc's type-name axis reach the invariants: func_ov006_02126b4c MATCHED (div 13 -> 0, 2026-09-13, run link100 wave 12 lane W12-2)
+
+`func_ov006_02126b4c` (ov006 0x02126b4c, 0x398) sat at 6cd's 13 through 3,497 hand cells
+and 14,363 permuter candidates (the 6cd addendum): the second loop's `i` and `off` webs
+swapped (ROM `i=r4 off=r7`, ours `i=r7 off=r4`), everything else byte-exact. It is
+byte-exact now with two spellings on top of the banked draft, and NEITHER moves anything
+on its own:
+
+```c
+    int i = 0;      /* dead: both arms assign i before reading it */
+    long off;       /* was int */
+```
+
+**Read the residue as an ORDER, not a swap.** Listing the second loop's callee-saved webs
+by the register they got (r4 first) turns every cell into a permutation:
+
+```text
+    ROM                 i, n, data, off, j, row, k842
+    6cd draft (13)      off, n, data, i, j, row, k842
+    + int i = 0 (27)    i, off, n, data, j, row, k842      i to the front; invariants 3-cycled
+    + long off (0)      i, n, data, off, j, row, k842      off to the back of the invariants
+```
+
+(`data` is the compiler's pool-address web for `data_ov006_0212f3bc`, `k842` the pool
+constant 0x842.) 6cd's own ladder reads the same way: with no dead stores the order is
+`row, j, i, off, n, data`; `tile`'s dead store flips the invariant group ahead of the
+carried group (23); each further dead store in the first loop's preamble pushes ITS
+variable to the back of the carried group (`row` 4th -> 6th, `j` 4th -> 5th), and the
+carried group's internal order is the DESCENDING order of the members' first-def positions.
+
+**Measured (all cells 2004/b56, build flags, 230 words unless noted).**
+
+* Dead-def position matters PER VARIABLE, not "loop 1's preamble only": `i = 5` at the
+  head of loop 1's preamble pushes `i` to the BACK (32); the same store in the entry block
+  pulls it to the FRONT (27). `tile`'s dead def works from the entry block too (23 on the
+  6cd-free base, contradicting 6cd's "ahead of the if does nothing"). Entry-block dead defs
+  of `j` (40) and `row` (50) pull those to the front as well, which is the wrong direction
+  here. Value kind is irrelevant (`i = 0`, `i = 5`, `i = col`, `int i = 0` initialiser: 27).
+* Loop-INVARIANT webs (`off`, `n`, `k842`, `masked`) ignore dead defs everywhere: entry
+  block, either preamble, either loop tail, loop 1's exit path (17 cells, all 27). In-loop
+  no-op defs (`off = off`, `off += 0`, a redundant recompute) fold before the count (13).
+* Renaming any local (10 cells): inert. Declaration rank of a fresh loop-2 counter (4
+  cells): inert. Declaration rank of `i` reaches LOOP 1 instead (52 at +0x14).
+* A fresh loop-2-only counter (`i2`) sorts second, behind `off`, wherever declared (31).
+  Making `data` a source-level pointer local recolours loop 1 (52).
+* Address association in loop 2 (`ptr + off + 0x800`: 39; parenthesised constant: 116;
+  base-pointer temp: 27) does not reach the invariants either.
+* `long off` on the 6cd draft ALONE: 13 (CRK-A's 360-cell rank x type sweep). `long off`
+  after the entry initialiser: 0. `long n` / `unsigned off` / `long masked` after it: 27.
+
+So 6cc's joint axis is real but was masked: the type name only re-sorts webs that are
+already adjacent in the order, and `off` had to be brought next to the invariants' tail
+first. The `#pragma opt_strength_reduction off` and the sixteen volatile u16 locals stay
+load-bearing (the ROM spills each tile around the screen-pointer call).
+
+**How to apply.** On a pure regperm residue in a SECOND loop, write the colouring as an
+order (r4, r5, ... by web) for the ROM and for every cell. Loop-carried variables move
+with dead defs: entry block -> front, the earlier loop's preamble -> back. Loop-invariant
+webs do not move with dead defs; once the carried variables are placed, sweep the
+invariants' type names (int/long, and the fresh-vs-shared choice) to rotate them. Do the
+two steps in that order; each is inert alone.
+
+## 6cv. The receiver lever on a CSE web that crosses a call: give the products the ROM keeps live across the call the guard-crossing locals that already exist, then let statement order settle the tail: func_ov002_020cfea4 MATCHED (div 36 -> 0, 2026-09-13, run link100 wave 12 lane W12-3)
+
+`func_ov002_020cfea4` (ov002 0x020cfea4, 0x2d4) closed three lanes as a colouring floor
+(DMID2 36, CRK-E 36 after ~1,430 hand cells, ~8,200 permuter iterations, the full pragma
+vocabulary and 25 builds). The residue was a closed 5-cycle over the tail's webs plus the ten
+schedule words that follow from it: the two pts[1] reloads, the lowered y, the two sums and
+the second lowered y took r8/lr/r7/r3/ip/sb where the ROM has ip/lr/r3/r8/sb/r7. It is
+byte-exact now, plain C++ under the build's flags, with these spellings in the tail:
+
+```c
+        int y = *(int *)(self + 0x60);
+        int yl = y - 0xa000;            /* the lowered y BEFORE the pts[1] reloads   */
+        int px = pts[1].x;
+        int pz = pts[1].z;
+        pts[2].x = px; pts[2].y = yl; pts[2].z = pz;
+        ...
+                dx = tbl[t] * 60;       /* the products live in dx/dz, the locals that */
+                dz = tbl[t + 1] * 60;   /* already cross the first cfd84 guard; x first */
+                yl2 = y2 - 0xa000;      /* the second lowered y AFTER the products     */
+                pts[3].x = px + dx;
+                pts[3].y = yl2;
+                pts[3].z = pz + dz;
+        ...
+    pts[3].x = pts[1].x - dx;
+    pts[3].z = pts[1].z - dz;
+```
+
+**The mechanism.** The ROM keeps `tbl[t] * 60` and `tbl[t + 1] * 60` in r5/r4 across the
+first `func_ov002_020cfd84` call and subtracts them after it. Every earlier draft spelt
+`dx * 60` twice and let 2004/b56 build the CSE web itself: an anonymous compiler temp that
+crosses the call guard. With the products assigned to `dx`/`dz`, the function-scope locals
+that already cross that guard (6ct's class: a variable with a web live across a branch out of
+the block), the same two values are named webs, and the allocator's order over the tail
+changes: the two reloads and the lowered y take the caller-saved ip/r3/lr the ROM gives them,
+the two sums take r8/r7 and the second lowered y is left with sb. The statement order then
+decides the rest: the lowered y must be computed before the reloads (after them: div 11,
+px lands in lr), the second lowered y after the products (before them: div 78), and x's
+product before z's (z first: div 12). Once those are fixed the ten schedule words in
++0x1c4..+0x1f8 follow without further help.
+
+**Measured (all compiled with rombuild.CFLAGS under 2004/b56, scored per word, the six tail
+webs read out of the pts[4]/pts[5] copy stores as a signature):**
+
+| family | cells | result |
+|---|---|---|
+| a guard-crossing receiver (`fr`/`other`, the function's two pointer locals) on px / pz / yl / yl2 / pxd / pzd singly and in pairs | 14 | only px moves (r8 -> lr, and the pz load is issued first, div 39); pz/yl/yl2/pxd/pzd receivers byte-identical |
+| products named at function scope, in dx/dz, sums into dx/dz | 8 | function-scope products recolour the whole body (self r6 -> r7, div 55/56); products in dx/dz plus px -> other: the first cell with px:ip yl:lr (div 50) |
+| declaration rank x type x scope of the nine tail locals (block top / function scope, int/long, sums named or anonymous) | 19 | every cell byte-identical to the base (rank is inert once declarations are split from assignments) |
+| load order of the two reloads | 2 | swaps the r7/r8 pair only |
+| engine (19 knobs: receiver of each web, product form, statement positions, copy forms), plateau-walking climb accepting ties, 8 compiles in flight | 10,360 to the first 0; 67,784 total | 36 -> 34 -> 33 -> 32 -> 27 -> 19 -> 0 at about cell 3,400; 12,580 distinct cells at 0 in the log once the products sit in dx/dz |
+| single-knob sensitivity around the 0 | 43 | load-bearing: products in dx/dz, dx before dz, yl before the reloads, yl2 after the products, px loaded before pz, yl and yl2 named; free: which receiver yl uses (none needed), y2 as a second load or a reuse of y, header order, t named or inline, sums named or anonymous, struct or element-wise copies |
+
+**How to apply.** When a residue is a permutation over a block's webs and the ROM keeps some
+value live ACROSS A CALL that the draft recomputes or CSEs, look for a function-scope local
+that already crosses the guard the call sits under and is dead where the value is born, and
+assign the value to it (here the table entries times their scale, not the raw entries). Then
+sweep the statement order of the block with a scorer that reads the decisive registers, not
+just the count: the receiver alone moved two webs here and the order closed the other four.
+A receiver that helped the climb (`other` holding the lowered y) turned out not to be needed
+once the products were named; measure the single-knob neighbourhood of a match before
+writing it up, because the engine's path to a cell is not the lever.
+
+## 6cw. The callee-saved colour list 2004/b56 hands to main-line call results is r8, r7, r6, r5, fp, sl, sb in declaration order, and the fourth slot is the whole of func_02009e70's exchange (div 72, floor with the mechanism measured; run link100 crack wave 12, lane W12-13, 2026-09-13)
+
+`func_02009e70` (arm9 0x02009e70, 0x109c, the camera update) sits at 72 words, 52 of them one
+web exchange at birth: the func_020093f4 distance limit is born into r5 where the ROM takes sl,
+and the mode-flags word born one call later takes the other register (6ci and its addendum name
+the site; CRK-M, CRK2-M and this lane measured about 3,700 cells on it). Wave 12 applied WALL-B's
+receiver lever (6ct) to it: every local dead across the birth was made the limit's receiver, in
+one arm and in both, with block temps at two depths and two widths, with the fp value routed
+through a temp, with the flags moved into an existing dead local, with 6y-1 boosters on all three
+webs, with 6cd dead defs at seventeen positions, with copy-born and laundered spellings of the
+flags crossed with every rank order of the three variables, and with launders on the limit's two
+defs. Not one cell gives the limit sl or the flags r5. What the sweep bought instead is a model of
+the allocator that predicted every cell after the second batch, including a 500-cell random
+product, and it says why no spelling can.
+
+**The model, from the rank data.** Move the limit's declaration and read the four R01 words:
+
+| `sl` declared | limit | HorzLen (r7) | c66c (r6) | fp-var | f20 | count |
+|---|---|---|---|---|---|---|
+| first | r7 | r6 | r5 | fp | r7 | 112 |
+| between r7 and r6 | r6 | r7 | r5 | fp | r6 | 103 |
+| after r6, before fp (shipped) | r5 | r7 | r6 | fp | r5 | 72 |
+| after fp | fp | r7 | r6 | r5 | sb | 125 |
+| fp first, sl as shipped | fp | r6 | r5 | r7 | r7 | 146 |
+
+The limit takes the n-th entry of the list `r8, r7, r6, r5, fp, sl, sb` where n is its position,
+in DECLARATION order, among the call-result copies born in the entry-dominated main line: self
+(the parameter copy, always first), `r7 = Vec3_HorzLen`, `r6 = func_0200c66c`, `sl` and
+`fp = func_020093f4`. Nothing else has a rank: the declaration position of the flags word (a
+load-and-mask), of f20 (a load), of r4, of sb (whose atan2 web is a call result but a conditional
+one), of r7h and of t0 never moves a word, and the flags word spelled into the dead local `fl`
+instead of `r5` is byte-identical. Those webs are coloured afterwards, r4 first and sl before sb:
+f1c takes r4, f20 takes r5 because the limit does not overlap it, and the flags take sl because
+the limit holds r5 across them. When `sl` is declared after `fp`, fp-var takes the r5 slot and the
+limit fp, f20 has to go to sb, and the 64-bit FXMULC temp that used sb takes the r5 that is free
+before fp-var's birth: every register in the 125 follows from the list.
+
+**The ROM's colouring is the same shape with a different list.** self r8, HorzLen r7, c66c r6,
+fp-var fp, limit sl, flags r5 is what the two-pass model emits when the first pass hands its
+fourth and fifth main-line call results fp and sl and leaves r5 to the second pass, where the
+flags take it as the lowest register after r4. That is 6bs seen from above: the register b56
+"recycles" at +0x2d0 is not a just-died coincidence, it is the fourth entry of a list the ROM's
+compiler does not put there.
+
+**Why source cannot reach it.** The limit is a copy-born main-line web and is coloured in the
+first pass, before the flags. For the flags to end in r5 no web overlapping +0x310..+0xfc8 may
+hold r5 when the second pass runs; for the limit to skip r5, a web coloured before it and
+overlapping it must hold r5. Such a web would live only inside +0x2b4..+0x30c and cross a call,
+and the one value born there (the func_0200bec4 result) crosses none and is r0. Every spelling
+that adds a main-line copy web (an `sl = fp` hoisted above the branch: four bytes short and a
+global recolour with fp spilled; an extra temp declared before sl; `sb` as the receiver of the
+atan2 cast in R03: 279, self leaves r8) shifts every slot; every spelling that tries to move a web
+between the passes (a copy from a temp, a u64 or s64 launder, a self-select booster, a block-
+scoped temp) is coalesced or folded before the pass runs and is byte-identical. The random
+product over load order, FXMULC operand orders, the `sb = 0` slot, the abs form, the flags
+variable, the rank order, the block-temp shape and the FXMUL operand order at the fp call (500
+cells) walks the limit through r5, r6, r7 and r8 and never sl.
+
+**Two smaller mechanisms on the same body.** R02 (+0x4ac, 6 words): the constant held in a local
+with the store spelled after the ty load makes +0x4a8..+0x4b0 exact, and then b56 issues the
+`ty + 0x3e8000` add at +0x4b4 ahead of the two ready loads (it frees ty's register) where the ROM
+issues the loads; `__restrict` on self changes nothing, so it is a scheduler-priority choice, not
+an alias stall, and it costs five words downstream in all eight spellings. R03 (+0x618, 12
+words) is the 6cq shape verbatim (the (s16) cast of the atan2 sum written into sb by the ROM and
+into the dying r0 by b56) and the receiver lever with the ROM's own register variable as the home
+is the 279 above: the receiver has to be a web that is already coloured the way the ROM colours
+it, and `sb` here is not (b56 gives that variable's webs sb only because sl is taken).
+
+**How to apply.** On a two-web exchange between a call result and a non-call value, before
+sweeping receivers: list the call-result copies in the entry-dominated main line in declaration
+order, count the ones declared before the web in question that overlap it, and read the register
+off `r8, r7, r6, r5, fp, sl, sb`. If the ROM's register for that web is not the entry the count
+lands on, no rank, receiver, booster or launder will move it, because they all act on the count
+or on the class and the class is fixed at web construction. Bank the draft and say which slot.
+
+## 6cx. A callee's DECLARED signature is a register-allocation input: a method called with its `this` argument keeps the incoming parameter's r0 live through the entry block, and every entry-block temp then skips r0: func_ov063_02117cdc MATCHED (div 3 -> 0, 2026-09-13, run link100 wave 12 lane W12-1)
+
+`func_ov063_02117cdc` (ov063 0x02117cdc, 0x77c) sat at three words through 6ce and its
+addendum (lanes DCHEAP and CRK-A: ~1,400 cells, 25 builds, the full pragma vocabulary, two
+permuter runs), all three the switch selector's register in the entry block: the ROM loads
+it to r2 at +0x0c with the pool address in r1 and r0 untouched; every build we own puts the
+selector in r0 or r1. The 6ce addendum read the ROM's r0 skip as a reservation of the
+incoming parameter's register across its home instruction and declared it unreachable from
+source. It is reachable, and the lever is not a spelling of the entry block at all:
+
+```c
+extern void *_ZN8dActor_c13ClosestPlayerEv(void *self); /* was declared (void) */
+    ...
+    case 0:
+        *(void **)(arg0 + 0x488) = _ZN8dActor_c13ClosestPlayerEv(arg0); /* was called with no argument */
+```
+
+The ROM's case 0 begins at +0x50 with `bl _ZN8dActor_c13ClosestPlayerEv` and no r0 setup:
+that symbol is `dActor_c::ClosestPlayer()`, a method, and its `this` is the function's own
+parameter, still in r0 from the entry. The draft had declared it `(void)` and called it with
+no argument, so the parameter's web died at the homing copy `mov r6,r0` and the selector
+took r0. With the argument declared, the parameter's r0 web is live from the entry into
+case 0, both entry-block temps are coloured around it (pool r1, selector r2), and the body
+is byte-exact: 0/479 with the PLAIN pool address, 0 with `*(void **)&data_0209f318`, and 5
+with the laundered pool address (the launder flips the order of the two temps, 6ce's
+attractor pair). Dropping each of the draft's 21 LAU launder sites one at a time, and then
+all of them together: 0 in every cell, so the landed file carries no launder.
+
+**The oracle that found it.** Every function in the config whose entry block homes r0 into
+a callee-saved register and dispatches a switch (`addls` or `addlo pc,pc,rS,lsl #2`) within
+the first ten words: 69. The ROM puts the selector in r0 in 30 of them and in r1 or r2 with
+r0 untouched in 36, and 2004/b56 reproduces BOTH groups on the matched members (20 of the
+r1/r2 group have matched source, five of them ov063 siblings), so the skip is
+source-reachable and the question was what separates the groups. Not the count of
+`mov r0,<home>` copies in the body (`PyramidLift::Behavior` has three and a selector in r0;
+`KnockDownPlank::Behavior` has the identical `switch (mState)` spelling and a selector in
+r1), so the property lives in the case bodies, not the switch. What separates them is a case
+that consumes r0 STRAIGHT FROM THE ENTRY without a copy: `func_ov063_021172a8`, the
+dispatcher that calls this very function, is matched with its selector in r1 and its cases
+are `bl g` with no `mov r0,r4` before the call. Mutating that dispatcher confirmed it: every
+variant that keeps a case consuming the parameter in r0 keeps the selector in r1 (8 cells;
+the tail shape after the call is irrelevant), and every variant where the parameter is dead
+after the switch loads the selector off r0 itself.
+
+**Measured (all 2004/b56, build flags, scored per word; the harness and the scan script
+live in the lane's untracked scratch and are summarised in out/W12-1/attempts.txt):**
+
+| family | cells | result |
+|---|---|---|
+| the 6ct receiver recipe, literal: the selector parked in an existing guard-tested local hoisted to function scope (nine locals) and at ranks 0..3, the pool address parked in a hoisted pointer local, pool x selector receivers, C++ free-function and method forms | 47 | every size-exact cell 3 (selector r0); the parked selector is coloured exactly as the bare temp |
+| the parameter copied into a local (three pointer types, first or last declaration, both pool forms) | 9 | 3 or 5: copy-propagated away, objects identical to the base of each pool form |
+| `ClosestPlayer(arg0)` on the laundered, plain and `*(void **)&` pool forms | 3 | 5, **0**, **0** |
+| LAU launder sites dropped one at a time, then all 21 at once | 22 | 0 in every cell |
+
+**What this corrects.** 6ce's "parameter-home reservation" is a liveness fact about the
+callee, not a rule of the ROM's compiler: the parameter's register is skipped exactly when
+something later consumes it, and here the consumer was a method call whose receiver the
+draft had dropped. The 6ce addendum's blanket negative ("not reachable from a third
+spelling") stands for spellings of the entry block and falls for the callee's arity. CRK-A's
+746 cells and two permuter runs could not reach it because the permuter never changes a
+callee's arity, and no spelling of the block the residue sits in can either: the register in
+question is owned by a web born before the block and consumed after it.
+
+**How to apply.** Before calling an entry-block colouring a floor, and before any receiver
+sweep, read every call site in the ROM whose first instruction is the `bl` itself (no r0
+setup) and check the callee's DECLARED signature against it: a C++ method called from a C
+draft with no `this` argument, a function declared with fewer parameters than the ROM
+passes, or a `void` declaration for a callee whose value the ROM keeps (PR #2528's
+missing-return-value lever is the same class seen from the other side). A callee's
+declaration is part of the register-allocation input of every function that calls it.
