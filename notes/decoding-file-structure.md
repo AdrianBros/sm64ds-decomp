@@ -108,3 +108,18 @@ size evidence.
 
 `git log --follow` on the TU file. What used to be "assembled from"
 tables and "the decomp used to call it X" notes is commit history.
+
+## Relocation expectations
+
+`relocs.txt` next to each overlay's `symbols.txt` lists the expected
+relocations (`from:`/`kind:`/`to:`/`module:`) — the file behind every
+old "a relocation the ROM build checks" note:
+
+    grep "0x020ec004" config/arm9/overlays/ov002/relocs.txt
+
+## Field status in structures
+
+`unk_` is an unidentified field, `pad_` an explicit observed gap;
+renaming either cannot change codegen, only offsets matter. The
+full epistemics stamp survives where `gen_header.py` wrote it, e.g.
+[Clipper.h](../include/Clipper.h).
