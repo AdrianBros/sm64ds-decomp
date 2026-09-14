@@ -44,13 +44,13 @@ extern "C" BMD_File *_ZN5Model8LoadFileER13SharedFilePtr(SharedFilePtr &f);
 extern "C" void *_ZN15TextureSequence8LoadFileER13SharedFilePtr(SharedFilePtr &f);
 extern "C" void _ZN15TextureSequence7PrepareER8BMD_FileR8BTP_File(BMD_File &a, BTP_File &b);
 extern "C" void *_ZN9Animation8LoadFileER13SharedFilePtr(SharedFilePtr &f);
-extern "C" void _ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector35Fix12IiES6_jj(void *self, void *a, Vector3 const &b, int c, int d, unsigned int e, unsigned int f);
+extern "C" void _ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector35Fix12IiES6_jj(void *self, void *a, const Vector3 *b, int c, int d, unsigned int e, unsigned int f);
 extern "C" unsigned char _ZN8dActor_c9TrackStarEjj(void *self, unsigned int a, unsigned int b);
 extern "C" void func_ov071_02121634(void *self, int a);
 extern "C" void _ZN9ModelAnim7SetAnimEP8BCA_Filei5Fix12IiEj(void *self, BCA_File *f, int a, int b, unsigned int c);
 extern "C" void _ZN15TextureSequence7SetFileER8BTP_Filei5Fix12IiEj(void *self, BTP_File &f, int a, int b, unsigned int c);
 extern "C" void _ZN9dBgCh_GndC1Ev(void *self);
-extern "C" void _ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P8dActor_c(void *self, Vector3 const &pos, void *act);
+extern "C" void _ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P8dActor_c(void *self, Vector3 *pos, void *act);
 extern "C" int _ZN9dBgCh_Gnd10DetectClsnEv(void *self);
 extern "C" void func_ov071_02120c90(void *c);
 extern "C" void _ZN9dBgCh_GndD1Ev(void *self);
@@ -96,7 +96,7 @@ s32 MrI::InitResources()
         v.x = 0;
         v.y = -0x4b000;
         v.z = 0;
-        _ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector35Fix12IiES6_jj(&mdCcAcPos_c, c, v, 0x55000, 0x96000, 0x200004, 0x42000);
+        _ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector35Fix12IiES6_jj(&mdCcAcPos_c, c, &v, 0x55000, 0x96000, 0x200004, 0x42000);
         mScaleX = 0x1000;
         mScaleY = 0x1000;
         mScaleZ = 0x1000;
@@ -108,7 +108,7 @@ s32 MrI::InitResources()
             v.x = 0;
             v.y = -0x96000;
             v.z = 0;
-            _ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector35Fix12IiES6_jj(&mdCcAcPos_c, c, v, 0xaa000, 0x12c000, 0x200004, 0);
+            _ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector35Fix12IiES6_jj(&mdCcAcPos_c, c, &v, 0xaa000, 0x12c000, 0x200004, 0);
             mScaleX = 0x2000;
             mScaleY = 0x2000;
             mScaleZ = 0x2000;
@@ -138,7 +138,7 @@ s32 MrI::InitResources()
 
     char rg[0x50];
     _ZN9dBgCh_GndC1Ev(rg);
-    _ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P8dActor_c(rg, *(Vector3 *)&mPosX, c);
+    _ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P8dActor_c(rg, (Vector3 *)&mPosX, c);
     int y;
     if (_ZN9dBgCh_Gnd10DetectClsnEv(rg)) {
         y = (mPosY - *(int *)(rg + 0x44)) + 0x1e000;
