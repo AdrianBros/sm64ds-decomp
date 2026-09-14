@@ -2496,7 +2496,7 @@
    "src/game/actors/daBrq_c.cpp": ["param:#2 dActor_c *", "param:#5 Vector3_16 *", "param:#6 Vector3_16 *"],
    "src/game/actors/daObjPushblock_c.cpp": ["param:#2 void *", "param:#5 void *"],
    "src/game/actors/daPiano_c/_ZN8MadPiano13InitResourcesEv.cpp": ["param:#2 void *", "param:#5 void *"],
-   "src/game/actors/daTBasket_c/_ZN11daTBasket_c13InitResourcesEv.cpp": ["param:#2 void *", "param:#5 void *"],
+   "src/game/actors/daTBasket_c/_ZN11daTBasket_c13InitResourcesEv.cpp": ["param:#2 dActor_c *", "param:#5 Vector3_16 *", "param:#6 Vector3_16 *"],
    "src/game/actors/daTrs_c/_ZN7daTrs_c13InitResourcesEv.cpp": ["param:#2 void *", "param:#5 void *"]
   },
   "_ZN10dBgCh_ActrC1Ev": {
@@ -10859,7 +10859,6 @@
    "src/unnamed/ov063/__sinit_ov063_0211e29c.c": ["return:char []"]
   },
   "data_ov063_0211edec": {
-   "src/game/actors/daTBasket_c/_ZN11daTBasket_c13InitResourcesEv.cpp": ["return:void *"],
    "src/unnamed/ov063/__sinit_ov063_0211e29c.c": ["return:char []"]
   },
   "data_ov063_0211edf4": {
