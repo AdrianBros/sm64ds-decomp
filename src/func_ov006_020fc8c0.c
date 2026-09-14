@@ -11,7 +11,7 @@
 typedef long long s64;
 
 struct V { int a, b, c, d; };
-extern void func_ov004_020b023c(int a, int b, int c, int d, struct V *v);
+extern void func_ov004_020b023c(void *a, int b, int c, int d, struct V *v);
 extern short data_02082214[];
 extern int data_ov006_02136cd4[];
 
@@ -35,7 +35,7 @@ void func_ov006_020fc8c0(char *c)
             v.c = -v_b;
             v.d = v_a;
             func_ov004_020b023c(
-                data_ov006_02136cd4[bidx],
+                (void *) data_ov006_02136cd4[bidx],
                 b,
                 c2,
                 -1,
