@@ -14,12 +14,12 @@
 extern "C" {
 extern u8 DecIfAbove0_Byte(u8 *p);
 extern int Sound_PlayIfNotActive(int handle, int a, int b, int c);
-extern void func_02012718(int a, int b);
-extern void func_02012790(int a);
-extern void func_0202ec9c(void *fader, int a);
+extern void func_02012718(void *a, int b);
+extern unsigned int func_02012790(unsigned int a);
+extern int func_0202ec9c(void *fader, int a);
 extern void func_ov004_020ad79c(int a, int b);
 extern void func_ov004_020adb1c(int a);
-extern void func_ov004_020ae274(int a);
+extern void func_ov004_020ae274(void *c);
 extern void func_ov006_0210c180(void *o);
 extern void func_ov006_0210c1a8(void *o);
 extern void func_ov006_0210c218(void *o, s16 x, s16 y);
@@ -120,7 +120,7 @@ s32 dScMgSlot1_c::Behavior()
                                 mBetIcon.unk_011 = 0;
                                 func_ov004_020ad79c(unk_0a8, mHudScore);
                             }
-                            func_02012718(0x162, data_ov006_0213e63c[i][0] << 12);
+                            func_02012718((void *) 0x162, data_ov006_0213e63c[i][0] << 12);
                             break;
                         }
                     }
@@ -213,9 +213,9 @@ s32 dScMgSlot1_c::Behavior()
             unk_46a4[idx] = 0;
             *(u8 *)(c + 0x470c) = 0xa;
             unk_46b4++;
-            func_02012718(0x164, data_ov006_0213e63c[idx][0] << 12);
+            func_02012718((void *) 0x164, data_ov006_0213e63c[idx][0] << 12);
             if (idx == 0) {
-                func_ov004_020ae274(2);
+                func_ov004_020ae274((void *) 2);
             }
         }
         break;
@@ -226,7 +226,7 @@ s32 dScMgSlot1_c::Behavior()
             unk_46a4[2] = 0;
             *(u8 *)(c + 0x470c) = 0x3c;
             unk_46b4 = 8;
-            func_02012718(0x164, data_ov006_0213e63c[2][0] << 12);
+            func_02012718((void *) 0x164, data_ov006_0213e63c[2][0] << 12);
         }
         break;
     case 8:
