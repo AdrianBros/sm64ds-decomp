@@ -1,8 +1,8 @@
 # daBrq static-initializer ownership and generation proof
 
-This is a production-boundary audit for `__sinit_ov070_02122d80`. It does not
+This is a production-boundary audit for [__sinit_ov070_02122d80](../src/__sinit_ov070_02122d80.cpp). It does not
 change an enrolled source, linker configuration, or symbol name. The guarded
-probe in `notes/sinit-probes/dabrq.cpp` contains ordinary global C++ objects and
+probe in [notes/sinit-probes/dabrq.cpp](../notes/sinit-probes/dabrq.cpp) contains ordinary global C++ objects and
 no hand-written initializer.
 
 ## What this note is, and is not
@@ -30,8 +30,8 @@ produced this initializer organically? It could, as shown below.
 
 ## Verdict
 
-`__sinit_ov070_02122d80`, its `.ctor` word, six PMF descriptors, and the BSS
-objects they initialize belong to the `ov070/daBrq_c` translation unit.
+[__sinit_ov070_02122d80](../src/__sinit_ov070_02122d80.cpp), its `.ctor` word, six PMF descriptors, and the BSS
+objects they initialize belong to the [ov070](../config/arm9/overlays/ov070/symbols.txt) [daBrq_c](../src/game/actors/daBrq_c.cpp) translation unit.
 CodeWarrior 2004/b56 organically reproduces the entire initializer from five
 resource objects, three state-handler pairs, and one `Vector3`-shaped object:
 
@@ -76,8 +76,8 @@ part of this audit.
 ## Symbol spacing on `main`: no absorbed array, no phantom index
 
 An inferred initializer can silently absorb a short array into the entry below
-it and invent indices that do not exist. The ov070 symbol table rules that out
-here. In `config/arm9/overlays/ov070/symbols.txt`:
+it and invent indices that do not exist. The [ov070](../config/arm9/overlays/ov070/symbols.txt) symbol table rules that out
+here. In [overlays/ov070/symbols.txt](../config/arm9/overlays/ov070/symbols.txt):
 
 - five resource handles at `0x021235ec`, `0x021235f4`, `0x021235fc`,
   `0x02123604`, `0x0212360c`: every 8 bytes;
@@ -111,9 +111,9 @@ without a hand-written `extern "C"` initializer.
 ## Reproduction
 
 Compile the guarded probe with the pinned production C++ flags (the
-`CPP_FLAGS` string in `tools/swarm.py`, through `compile_c` in
-`tools/match.py`) plus `-DSINIT_OWNERSHIP_PROBE`. Comparing `__sinit_dabrq.cpp`
-in that object with `__sinit_ov070_02122d80` from the committed exact
+`CPP_FLAGS` string in [tools/swarm.py](../tools/swarm.py), through `compile_c` in
+[tools/match.py](../tools/match.py)) plus `-DSINIT_OWNERSHIP_PROBE`. Comparing `__sinit_dabrq.cpp`
+in that object with [__sinit_ov070_02122d80](../src/__sinit_ov070_02122d80.cpp) from the committed exact
 transcription gives:
 
 ```text
