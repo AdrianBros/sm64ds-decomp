@@ -18,9 +18,9 @@ typedef unsigned int u32;
 typedef int s32;
 
 extern "C" {
-extern void func_02012718(int a, int b);
+extern void func_02012718(void *a, int b);
 extern void func_02012dbc(int a);
-extern int func_ov006_020d25fc(void *thiz, int idx, u32 val);
+extern int func_ov006_020d25fc(void *thiz, int idx, int val);
 extern int func_020126e8(int a);
 extern void func_020126ac(int a0, int a1, int a2, int a3, int a4);
 extern int data_ov006_0212e1c0[];
@@ -179,26 +179,26 @@ extern "C" void func_ov006_020d27dc(void *arg0)
                         if (sl == 1) {
                             if (((struct Obj *)p)->m90() != 0) {
                                 if (*(u8 *)(p + 0x46d5) == 0) {
-                                    func_02012718(v10, *dirSlot << 0xc);
+                                    func_02012718((void *) v10, *dirSlot << 0xc);
                                     u32 w2 = *(u32 *)(p + idx * 4 + 0x46a4);
                                     switch (w2) {
                                     default:
                                         break;
                                     case 0:
-                                        func_02012718(v14, *dirSlot << 0xc);
+                                        func_02012718((void *) v14, *dirSlot << 0xc);
                                         break;
                                     case 1:
-                                        func_02012718(v18, *dirSlot << 0xc);
+                                        func_02012718((void *) v18, *dirSlot << 0xc);
                                         break;
                                     case 2:
-                                        func_02012718(v1c, *dirSlot << 0xc);
+                                        func_02012718((void *) v1c, *dirSlot << 0xc);
                                         break;
                                     case 3:
-                                        func_02012718(v20, *dirSlot << 0xc);
+                                        func_02012718((void *) v20, *dirSlot << 0xc);
                                         break;
                                     }
                                 } else {
-                                    func_02012718(0x1c3, *dirSlot << 0xc);
+                                    func_02012718((void *) 0x1c3, *dirSlot << 0xc);
                                 }
                                 *flag = c1;
                                 *(s32 *)(p + 0x46cc) += 1;
@@ -220,8 +220,8 @@ extern "C" void func_ov006_020d27dc(void *arg0)
 
                             {
                                 s32 *d2 = (s32 *)((int)(p + idx * 8) + 0x4660);
-                                func_02012718(v10, *d2 << 0xc);
-                                func_02012718(0x1c1, *d2 << 0xc);
+                                func_02012718((void *) v10, *d2 << 0xc);
+                                func_02012718((void *) 0x1c1, *d2 << 0xc);
                             }
                             *flag = c1;
                             *(s32 *)(p + 0x46cc) += 1;
@@ -263,9 +263,9 @@ extern "C" void func_ov006_020d27dc(void *arg0)
                         if (((struct Obj *)p)->m90() != 0) {
                             func_02012dbc(5);
                             if (*(u8 *)(p + 0x46d5) == 0) {
-                                func_02012718(0x1c2, *(s32 *)(p + idx * 8 + 0x4660) << 0xc);
+                                func_02012718((void *) 0x1c2, *(s32 *)(p + idx * 8 + 0x4660) << 0xc);
                             } else {
-                                func_02012718(0x1c3, *(s32 *)(p + idx * 8 + 0x4660) << 0xc);
+                                func_02012718((void *) 0x1c3, *(s32 *)(p + idx * 8 + 0x4660) << 0xc);
                             }
                             *flag = 1;
                             *(u8 *)(p + 0x46d5) = 1;
@@ -275,7 +275,7 @@ extern "C" void func_ov006_020d27dc(void *arg0)
                             }
                             return;
                         }
-                        func_02012718(0xe1, *(s32 *)(p + idx * 8 + 0x4660) << 0xc);
+                        func_02012718((void *) 0xe1, *(s32 *)(p + idx * 8 + 0x4660) << 0xc);
                         *(s32 *)(p + 0x53c0) = 0x3c;
                         *(s32 *)(p + 0x46d0) = 2;
                         *(u8 *)(p + 0x46d5) = 1;
