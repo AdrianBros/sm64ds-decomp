@@ -61,7 +61,7 @@ extern "C" SharedFilePtr *data_ov071_021226a4[2];
 extern "C" SharedFilePtr data_ov071_021226a0;
 extern "C" SharedFilePtr data_ov071_02123048;
 extern "C" SharedFilePtr data_ov071_02123038;
-extern "C" char IDENTITY_MATRIX4X3;
+extern "C" Matrix4x3 IDENTITY_MATRIX4X3;
 
 struct M48 { int w[12]; };
 
