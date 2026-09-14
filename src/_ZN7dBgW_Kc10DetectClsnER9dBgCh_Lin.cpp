@@ -31,16 +31,16 @@ struct dBgPc { SurfaceInfo surface; dBgPc(); ~dBgPc(); };
 extern "C" {
 int  func_020397dc(s32 x);
 int  func_020397b8(s32 x);
-void _ZN5dBgPcC1Ev(SurfaceInfo *info);
-void _ZN5dBgPcD1Ev(SurfaceInfo *info);
-void func_02037fd4(dBgPi *res, s16 triIdx, SurfaceInfo *info);
-void func_020375ec(dBgCh_Lin *ray, Vector3 *pos);
-s16  func_020396dc(dBgW_Kc *self, KCL_Tri *prism);
+void _ZN5dBgPcC1Ev(dBgPc *info);
+void _ZN5dBgPcD1Ev(dBgPc *info);
+void func_02037fd4(int *res, short triIdx, int *info);
+void func_020375ec(int *ray, int *pos);
+short func_020396dc(int **self, unsigned int prism);
 int  _ZN5dBgCh21ShouldPassThroughImplEPvRK4CLPSRKS_b(void *self, SurfaceInfo *surf,
-                                                    dBgCh_Lin *ray, int isSteep);
+                                                    void *ray, int isSteep);
 Fix12i Vec3_Dist(const Vector3 *a, const Vector3 *b);
 s32  _ZN4cstd4fdivEii(s32 a, s32 b);
-void _ZNK11SurfaceInfo12CopyNormalToER7Vector3(SurfaceInfo *self, Vector3 *out);
+void _ZNK11SurfaceInfo12CopyNormalToER7Vector3(SurfaceInfo *self, Vector3 &out);
 }
 
 s32 dBgW_Kc::DetectClsn(dBgCh_Lin &ray)
@@ -222,16 +222,16 @@ s32 dBgW_Kc::DetectClsn(dBgCh_Lin &ray)
                     {
                     dBgPc pc;
                     Vector3 normal;
-                    triIdx = func_020396dc(this, prism);
+                    triIdx = func_020396dc((int **) this, (unsigned int) prism);
                     GetSurfaceInfo(triIdx, pc.surface);
-                    _ZNK11SurfaceInfo12CopyNormalToER7Vector3(&pc.surface, &normal);
+                    _ZNK11SurfaceInfo12CopyNormalToER7Vector3(&pc.surface, normal);
                     if (!_ZN5dBgCh21ShouldPassThroughImplEPvRK4CLPSRKS_b(
                             this, &pc.surface, &ray, func_020397b8(normal.y))) {
                         best.x = hit.x;
                         best.y = hit.y;
                         best.z = hit.z;
                         bestDist = dist;
-                        func_02037fd4(&ray.result, triIdx, &pc.surface);
+                        func_02037fd4((int *) &ray.result, triIdx, (int *) &pc.surface);
                         found = 1;
                     }
                     }
@@ -253,7 +253,7 @@ s32 dBgW_Kc::DetectClsn(dBgCh_Lin &ray)
     pos.x = best.x << 6;
     pos.y = best.y << 6;
     pos.z = best.z << 6;
-    func_020375ec(&ray, &pos);
+    func_020375ec((int *) &ray, (int *) &pos);
     }
     ray.hasClsn = 1;
     return 1;
