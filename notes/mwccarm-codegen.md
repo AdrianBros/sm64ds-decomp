@@ -7640,3 +7640,76 @@ short (size 0x538, frame 0x64). Explicit pointers above the loop cost 24, a ston
 open: the speed base is minted before the sin/cos table address in the ROM and after it here; the frame slot
 order (ROM nex, ney, &i.x, &idx.x, &i.y, &i.angle, nmx, nmy, ybase, anglebase, speedbase; ours nmx/nmy at
 8/0xc) does not move with nmx/nmy as expressions (0x550) or declared late (identical).
+
+## 6da. A scalar stack parameter the loop uses directly is register-homed in PARAMETER ORDER, and that is the only thing that puts its load ahead of the last self-home store: OAM::Render MATCHED (div 2 -> 0, 2026-09-13, run link100 lane W12-5)
+
+`_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiES3_ii` (arm9 0x02020994, 0x690) was the game's one
+"prologue self-home" floor (6cf, CRK-N): six stack parameters, four of them memory-homed as
+`ldr r0,[sp,#N]; str r0,[sp,#N]` self-copies, two (the Fix12<int> scales) register-homed into
+sb and fp, and the scheduler zipping the fillers into the self-home stalls. Every build put the
+last self-home store (`mode`, `[sp,#0x94]`) BEFORE the second scale load; the ROM puts it after:
+
+```text
+    +0x30 ldr r0,[sp,#0x94]  +0x34 ldr sb,[sp,#0x88]  +0x38 ldr fp,[sp,#0x8c]  +0x3c str r0,[sp,#0x94]   ROM
+    +0x30 ldr r0,[sp,#0x94]  +0x34 ldr sb,[sp,#0x88]  +0x38 str r0,[sp,#0x94]  +0x3c ldr fp,[sp,#0x8c]   2004/b56, every draft so far
+```
+
+**The lever is the parameter's TYPE CLASS, not anything in the body.** Declare the two scale
+parameters as plain `int` (a C file with the mangled name, the shape the matched 7-parameter
+sibling `_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiEi.c` already uses) and use them DIRECTLY in the
+loop, with no `sxv = scaleX` locals:
+
+```c
+void _ZN3OAM6RenderEbP7OamAttriiii5Fix12IiES3_ii(int sub, struct OamAttr *attr, int xOff, int yOff,
+        int palette, int priority, int scaleX, int scaleY, int rotation, int mode)
+    ...
+        if (scaleX != 0x1000 || scaleY != 0x1000 || rotation != 0) {   /* the parameter itself */
+```
+
+match.py MATCHING 2004/b56, linkcheck VERIFIED blind 0. The rule, one cell at a time:
+
+* A SCALAR stack parameter that the loop uses directly is register-homed by b56 and its homing
+  load is emitted in the parameter-homing block in PARAMETER ORDER: scaleX (#7) and scaleY (#8)
+  precede rotation (#9) and mode (#10) in the scheduler's input. The list scheduler pulls the
+  serial r0 chain (the four self-homes) to the front and fills each load-use stall with the
+  next ready filler in input order; at the fourth gap the `mode` store and `ldr fp` are both
+  ready with equal height and the tie goes to input order, so the load wins. That is the ROM.
+* A CLASS-TYPED by-value parameter is never register-homed by b56, whatever the class looks
+  like: `struct { T val; }`, a union, a conversion operator, a constructor, a 32-bit bitfield
+  member, an empty base, a getter (seven definitions, all div 87 when read directly: the CSE'd
+  member read is a BODY web, takes r4 at +0x34 and rotates the whole colouring, and the store is
+  still ahead of the second load). Its member read is emitted after every homing store, so at
+  the same tie the store is earlier in the input and wins. That is the div-2 residue every
+  lane measured.
+* A LOCAL COPY of a scalar parameter (`sxv = scaleX`, the sibling's `scale = scale0`) is the
+  same body load: div 2 again. The copy has to go; the parameter is the web.
+* One parameter at a time: `int scaleX` + struct scaleY keeps div 2 (scaleX's home takes
+  +0x34, scaleY's body load still trails the store); struct scaleX + `int scaleY` scores 15
+  (scaleY's home takes +0x34 as `[sp,#0x8c]`, scaleX's body load takes fp, and the sb/fp
+  colouring swaps through the body). Both must be scalar parameters.
+* CRK-N's late break (6cf: `new_var = mode` routed through a local moved the store after both
+  loads but into a fresh frame slot) is the same rule from the store's side: the copy's spill
+  is a body store, later in the input than the body loads.
+
+**Why it hid for a month.** The mangled name forces `5Fix12IiE`, a class type, so every C++
+draft kept the parameters class-typed, and every flattened-C control kept them as a by-value
+struct (`struct Fix12i scaleX`) or packed both into one 8-byte struct. A scalar parameter used
+directly was never compiled. The wave's 6cx lever ("the declaration as the callers see it")
+was the right axis; the answer was the parameter's type class inside the definition, which the
+byte gate cannot see through the mangled name. The four callee signatures were inert here (the
+body was already exact).
+
+**Cost and shape.** The .cpp gives way to a .c: the file scores real_name / no_raw_offset /
+no_unk_field / no_codegen_trick but fails no_mangled_refs (the four callees through their
+mangled names), so the CONVERTED identity leaves the baseline through the ratchet's own
+`--update --reason` road and the trade is recorded in config/converted-backslide-exceptions.jsonl.
+Byte-match outranks readability (the ratchet's own docstring). The three unscoped pragma offs
+stay load-bearing (6ay, CRK-N). A delinks entry for 0x02020994..0x02021024 is added: the
+NONMATCHING draft never had one.
+
+**Generalisation to check on the next prologue residue.** Wherever a stack parameter's homing
+load sits on the wrong side of another parameter's self-home store, ask what TYPE CLASS the
+parameter has in the draft: a struct wrapper or a local copy demotes the load to a body web
+and pushes it behind every homing store in the scheduler's input. The 6cf census found no
+other function with the self-home zip, so this is the only instance in the game, but the
+"parameter web vs body web" distinction is general and cheap to test.
