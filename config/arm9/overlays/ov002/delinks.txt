@@ -1093,6 +1093,10 @@ src/actors/Player.cpp:
     complete
     .text start:0x020bd828 end:0x020cfea4
 
+src/func_ov002_020cfea4.cpp:
+    complete
+    .text start:0x020cfea4 end:0x020d0178
+
 src/func_ov002_020d0178.c:
     complete
     .text start:0x020d0178 end:0x020d0580
