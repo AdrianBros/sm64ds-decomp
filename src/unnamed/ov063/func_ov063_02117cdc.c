@@ -5,7 +5,7 @@
  * the message, then hands control back with a random idle timer.
  *
  * One spelling is load-bearing for the entry block's register colouring
- * (notes/mwccarm-codegen.md 6cu): dActor_c::ClosestPlayer() is a method and
+ * (notes/mwccarm-codegen.md 6cx): dActor_c::ClosestPlayer() is a method and
  * takes `this` in r0, and case 0 calls it before anything else clobbers r0, so
  * the incoming parameter's r0 stays live from the entry into that call. That
  * keeps both entry-block temps (the switch selector and the camera pool
