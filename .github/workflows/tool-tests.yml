@@ -206,6 +206,7 @@ jobs:
             tools.test_enroll \
             tools.test_layout \
             tools.test_linkcheck \
+            tools.test_match \
             tools.test_match_attempts \
             tools.test_match_provenance \
             tools.test_message_bank \
@@ -317,6 +318,18 @@ jobs:
 #                                      bias, folded into the displacement, so its
 #                                      destination is the base alone.
 #                                      (2 of the 14 skip: the real-compile fixtures.)
+#   test_match                   (8)   match.py resolve_cpp_flags -- the flag set a
+#                                      candidate is actually compiled with. `match.py`
+#                                      scores, it does not gate, so a wrong flag does
+#                                      not fail: it reports a near miss against bytes
+#                                      the build would never produce and the operator
+#                                      hunts a source-level cause that is not there.
+#                                      `-Cpp_exceptions off` used to be appended only
+#                                      inside the c99 -> c++ rewrite, so a hand-passed
+#                                      `--flags "... -lang c++ ..."` skipped it, and an
+#                                      explicit `-Cpp_exceptions on` got a contradicting
+#                                      `off` appended beside it. Pure: no compiler, no
+#                                      ROM. Three of the eight fail on the pre-fix code.
 #   test_match_attempts         (10)   match_attempts.py -- append-only log of every
 #                                      matching attempt.
 #   test_match_provenance       (20)   match_provenance.py -- the durable how-record and

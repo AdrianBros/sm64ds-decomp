@@ -240,6 +240,38 @@ def compare(target: bytes, cand: bytes, relocs: set, verbose: bool = True):
     return ok, ndiff
 
 
+def resolve_cpp_flags(cfile, flags):
+    """The flag set `cfile` must actually be compiled with, given the requested `flags`.
+
+    Auto-detect C++ the same way fdiff/swarm do: a leading //cpp marker means compile with
+    -lang c++ instead of the default -lang c99, so C++ candidates stop failing to compile
+    (the file is already .cpp, so it compiles in place - no temp copy needed).
+
+    `-Cpp_exceptions off` then rides along with C++ mode HOWEVER THAT MODE WAS REACHED,
+    because the build compiles every C++ source with it and without it a source holding an
+    object with a destructor gets exception cleanup the ROM's bytes do not have (see
+    CPP_EXCEPTIONS_FLAG above). Until now the flag was appended only inside the c99 -> c++
+    rewrite, so `--flags "... -lang c++ ..."` passed by hand -- the documented way to compile
+    a candidate that is C++ without a //cpp marker -- skipped it silently and scored the
+    function against bytes the build would never produce. Nothing in the output said so:
+    the operator sees a near miss and goes looking for a source-level cause that is not there.
+    Same family as tools/pr_linkcheck.py, which compiled with flags the build does not use.
+
+    An explicit `-Cpp_exceptions` on either side is left alone, so a caller can still measure
+    the difference on purpose.
+    """
+    try:
+        is_cpp_source = cfile.read_text(encoding="utf-8").startswith("//cpp")
+    except OSError:
+        # a missing/unreadable candidate surfaces later at compile_c with a clearer error
+        is_cpp_source = False
+    if is_cpp_source and "-lang c99" in flags:
+        flags = flags.replace("-lang c99", "-lang c++")
+    if "-lang c++" in flags and "-Cpp_exceptions" not in flags:
+        flags += " " + CPP_EXCEPTIONS_FLAG
+    return flags
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--c", required=True)
@@ -291,20 +323,7 @@ def main():
             print(f"  (reloc-destination check unavailable: {e}; byte-only compare)")
 
     cfile = pathlib.Path(args.c)
-    # Auto-detect C++ the same way fdiff/swarm do: a leading //cpp marker means compile with
-    # -lang c++ instead of the default -lang c99, so C++ candidates stop failing to compile
-    # (the file is already .cpp, so it compiles in place - no temp copy needed).
-    # `-Cpp_exceptions off` rides along with the language flip, because the build compiles
-    # every C++ source with it and without it a source holding an object with a destructor
-    # gets exception cleanup the ROM's bytes do not have (see CPP_EXCEPTIONS_FLAG above).
-    flags = args.flags
-    try:
-        if cfile.read_text(encoding="utf-8").startswith("//cpp") and "-lang c99" in flags:
-            flags = flags.replace("-lang c99", "-lang c++")
-            if CPP_EXCEPTIONS_FLAG not in flags:
-                flags += " " + CPP_EXCEPTIONS_FLAG
-    except OSError:
-        pass  # a missing/unreadable candidate surfaces later at compile_c with a clearer error
+    flags = resolve_cpp_flags(cfile, args.flags)
     if args.bin:
         tgt = target_bytes(args.addr, args.size, pathlib.Path(args.bin), args.base)
     elif args.module and args.module != "arm9":
