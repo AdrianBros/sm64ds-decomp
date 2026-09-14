@@ -37,7 +37,7 @@ typedef unsigned char u8;
 typedef long long s64;
 
 extern int _ZN4cstd4sqrtEy(unsigned long long v);
-extern void func_02012718(int a, int b);
+extern void func_02012718(void *a, int b);
 extern void func_ov006_020fb8fc(char *c, int a2, int a3, int a4, int a5, int a6);
 extern s16 data_02082214[];
 extern int data_ov006_0212eb94[];
@@ -115,7 +115,7 @@ void func_ov006_020fdaf0(char *base, int i)
                 if (cc >= 5)
                     cc = five;
                 p60 = o + 0x4660;
-                func_02012718(data_ov006_0212eb94[cc], *(int *)(p60 + n));
+                func_02012718((void *)data_ov006_0212eb94[cc], *(int *)(p60 + n));
                 {
                     char *q = (char *)o + n;
                     func_ov006_020fb8fc(o,
