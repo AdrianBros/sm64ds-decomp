@@ -4327,16 +4327,19 @@
   },
   "_ZN3OAM11GetObjWidthEii": {
    "include/decl_OAM.h": ["arity:2", "return:int"],
+   "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiES3_ii.c": ["arity:2"],
    "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiEi.c": ["arity:2", "return:int"]
   },
   "_ZN3OAM12GetObjHeightEii": {
    "include/decl_OAM.h": ["arity:2", "return:int"],
+   "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiES3_ii.c": ["arity:2"],
    "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiEi.c": ["arity:2", "return:int"]
   },
   "_ZN3OAM14BOUNCING_ARROWE": {
    "src/_ZN5Stage20RenderBouncingArrowsEv.cpp": ["kind:function"]
   },
   "_ZN3OAM16LoadAffineParamsEP7OamAttrPiP9Matrix2x2": {
+   "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiES3_ii.c": ["arity:3"],
    "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiEi.c": ["arity:3"]
   },
   "_ZN3OAM4COINE": {
@@ -8373,12 +8376,10 @@
    "src/_ZN10dScTitle_c6RenderEv.cpp": ["return:char []"],
    "src/_ZN3OAM4LoadEv.cpp": ["return:int []"],
    "src/_ZN3OAM5FlushEv.cpp": ["return:unsigned int"],
-   "src/_ZN3OAM5ResetEv.cpp": ["return:OAMEntry []"],
-   "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiES3_ii.cpp": ["return:OamEntry []"]
+   "src/_ZN3OAM5ResetEv.cpp": ["return:OAMEntry []"]
   },
   "data_0209ea74": {
    "src/_ZN3OAM5FlushEv.cpp": ["return:unsigned int"],
-   "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiES3_ii.cpp": ["return:OamEntry []"],
    "src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiEi.c": ["return:OamAttr []"],
    "src/_ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2.cpp": ["return:OamAttr []"]
   },
