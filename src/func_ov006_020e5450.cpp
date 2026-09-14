@@ -14,8 +14,8 @@
 
 extern "C" {
 extern int _ZN4cstd4sqrtEy(u64 v);
-extern int _ZN4cstd5atan2E5Fix12IiES1_(int y, int x);
-extern void func_02012718(int id, int v);
+extern short _ZN4cstd5atan2E5Fix12IiES1_(int y, int x);
+extern void func_02012718(void *id, int v);
 extern s16 data_02082214[];
 }
 
@@ -103,7 +103,7 @@ nmx = FMUL(cP, vex); nmx -= FMUL(vmy, sP); nmy = FMUL(vex, sP) + FMUL(vmy, cP); 
             } else {
                 self->mStone[i].fast = 0;
             }
-            func_02012718(0xe8, self->mStone[idx].x);
+            func_02012718((void *) 0xe8, self->mStone[idx].x);
             self->SpawnValue(idx, i);
             return;
         }
