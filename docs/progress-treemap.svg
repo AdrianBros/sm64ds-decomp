@@ -36117,19 +36117,19 @@ matched: yes</title></rect><rect x="1542.33" y="375.70" width="4.79" height="6.8
 module: ov063
 addr: 0x0211d360
 size: 64 bytes
-matched: yes</title></rect><rect x="1542.33" y="382.54" width="4.79" height="8.55" fill="#3fa75a" stroke="#2c7a41" stroke-width="0.4"><title>_ZN12FallBlockBbhD1Ev
+matched: yes</title></rect><rect x="1542.33" y="382.54" width="4.79" height="8.55" fill="#3fa75a" stroke="#2c7a41" stroke-width="0.4"><title>_ZN20daObjTh_Fall_Block_cD1Ev
 module: ov063
 addr: 0x0211d3a0
 size: 80 bytes
-matched: yes</title></rect><rect x="1542.33" y="391.10" width="4.79" height="10.69" fill="#3fa75a" stroke="#2c7a41" stroke-width="0.4"><title>_ZN12FallBlockBbhD0Ev
+matched: yes</title></rect><rect x="1542.33" y="391.10" width="4.79" height="10.69" fill="#3fa75a" stroke="#2c7a41" stroke-width="0.4"><title>_ZN20daObjTh_Fall_Block_cD0Ev
 module: ov063
 addr: 0x0211d3f0
 size: 100 bytes
-matched: yes</title></rect><rect x="1547.12" y="353.04" width="2.30" height="4.45" fill="#3fa75a" stroke="#2c7a41" stroke-width="0.4"><title>_ZN12FallBlockBbh16CleanupResourcesEv
+matched: yes</title></rect><rect x="1547.12" y="353.04" width="2.30" height="4.45" fill="#3fa75a" stroke="#2c7a41" stroke-width="0.4"><title>_ZN20daObjTh_Fall_Block_c16CleanupResourcesEv
 module: ov063
 addr: 0x0211d454
 size: 20 bytes
-matched: yes</title></rect><rect x="1549.42" y="353.04" width="2.30" height="4.45" fill="#3fa75a" stroke="#2c7a41" stroke-width="0.4"><title>_ZN12FallBlockBbh13InitResourcesEv
+matched: yes</title></rect><rect x="1549.42" y="353.04" width="2.30" height="4.45" fill="#3fa75a" stroke="#2c7a41" stroke-width="0.4"><title>_ZN20daObjTh_Fall_Block_c13InitResourcesEv
 module: ov063
 addr: 0x0211d468
 size: 20 bytes
