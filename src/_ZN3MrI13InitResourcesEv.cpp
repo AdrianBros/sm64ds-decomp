@@ -72,7 +72,24 @@
 // This is NOT notes 6bs: 6bs is a register CHOICE and every register here already agrees.
 // It is an emission SLOT, and the lever that would buy it costs instructions the ROM does
 // not contain.
+//
+// LAUNDER/TEMP BISECTION, 2026-09-13, every cell re-measured at the exact size (fdiff
+// prints mismatches=999 and refuses to compare when the candidate size differs, so a
+// bare mismatch count is NOT evidence of anything until the size is asserted separately):
+//   FREE, adopted below -- the nested scope around the TrackStar store, the char[0x50]
+//   dBgCh_Gnd stand-in with its hand-written C1Ev/D1Ev calls and raw *(rg+0x44) read,
+//   and the two raw member offsets c+0x130 / c+0x144. All still 3/166 at 0x298, alone
+//   and combined. The dBgCh_Gnd form is taken from the matched twin
+//   src/_ZN10StarMarker13InitResourcesEv.cpp, which spells the same probe plainly.
+//   LOAD-BEARING, deliberately kept -- these are NOT launders and must not be tidied
+//   away: dropping `int isKind1 = (kind == 0x106); if (isKind1)` to a direct
+//   `if (kind == 0x106)` costs FIVE words (0x28c), because the ROM really does
+//   materialise the comparison into a register and then test it
+//   (cmp / moveq #1 / movne #0 / cmp #0 / beq). The same holds for isKind2, for the
+//   `kind` temp itself, and for the `int y` temp around the shadow height, whose
+//   removal costs two words the other way (0x2a0).
 #include "MrI.h"
+#include "dBgCh_Gnd.h"
 
 struct BMD_File;
 struct BTP_File;
@@ -89,11 +106,7 @@ extern "C" unsigned char _ZN5Actor9TrackStarEjj(void *self, unsigned int a, unsi
 extern "C" void func_ov071_02121634(void *self, int a);
 extern "C" void _ZN9ModelAnim7SetAnimEP8BCA_Filei5Fix12IiEj(void *self, BCA_File *f, int a, int b, unsigned int c);
 extern "C" void _ZN15TextureSequence7SetFileER8BTP_Filei5Fix12IiEj(void *self, BTP_File &f, int a, int b, unsigned int c);
-extern "C" void _ZN9dBgCh_GndC1Ev(void *self);
-extern "C" void _ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P5Actor(void *self, Vector3 const &pos, void *act);
-extern "C" int _ZN9dBgCh_Gnd10DetectClsnEv(void *self);
 extern "C" void func_ov071_02120c90(void *c);
-extern "C" void _ZN9dBgCh_GndD1Ev(void *self);
 
 extern "C" SharedFilePtr data_ov002_0210da38;
 extern "C" SharedFilePtr data_ov071_02123050;
@@ -167,27 +180,25 @@ s32 MrI::InitResources()
 
     _ZN9ModelAnim7SetAnimEP8BCA_Filei5Fix12IiEj(&mModelAnim, (BCA_File *)data_ov071_02123048.ptr, 0, 0x1000, 0);
 
-    *(int *)(c + 0x130) = 0x1000;
+    mModelAnim.speed = 0x1000;
     _ZN15TextureSequence7SetFileER8BTP_Filei5Fix12IiEj(&mTextureSequence, *(BTP_File *)data_ov071_02123038.ptr, 0, 0x1000, 0);
 
-    *(int *)(c + 0x144) = 0x1000;
+    mTextureSequence.speed = 0x1000;
     unk_1ec = 0;
     mTimer = 0x2e;
 
     *(M48 *)&mShadowMat = *(M48 *)&data_02082128;
 
-    char rg[0x50];
-    _ZN9dBgCh_GndC1Ev(rg);
-    _ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P5Actor(rg, *(Vector3 *)&mPosX, c);
+    dBgCh_Gnd rg;
+    rg.SetObjAndPos(*(Vector3 *)&mPosX, this);
     int y;
-    if (_ZN9dBgCh_Gnd10DetectClsnEv(rg)) {
-        y = (mPosY - *(int *)(rg + 0x44)) + 0x1e000;
+    if (rg.DetectClsn()) {
+        y = (mPosY - rg.clsnY) + 0x1e000;
     } else {
         y = 0x12c000;
     }
     mShadowHeight = y;
     func_ov071_02120c90(c);
-    _ZN9dBgCh_GndD1Ev(rg);
 
     return 1;
 }
