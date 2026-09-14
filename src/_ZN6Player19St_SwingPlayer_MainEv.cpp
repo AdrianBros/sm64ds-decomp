@@ -21,12 +21,12 @@ struct Vec3 { int x, y, z; };
 
 extern "C" {
 extern int _ZN6Player12FinishedAnimEv(char* c);
-extern void _ZN6Player7SetAnimEji5Fix12IiEj(char* c, u32 anim, int a, s32 b, u32 d);
+extern void _ZN6Player7SetAnimEji5Fix12IiEj(char* c, u32 anim, int a, s32 b, u16 d);
 extern void func_ov002_020d9c70(char* c);
 extern int func_ov002_020da95c(char* c);
-extern void func_ov002_020da9d4(char* c);
-extern void _Z15ApproachLinear2Rsss(s16* ref, s16 target, s16 step);
-extern u32 _ZN8Particle6System3NewEjj5Fix12IiES2_S2_PK11Vector3_16fPNS_8CallbackE(u32 h, u32 id, s32 x, s32 y, s32 z, void* v, void* cb);
+extern int func_ov002_020da9d4(char* c);
+extern int _Z15ApproachLinear2Rsss(s16* ref, s16 target, s16 step);
+extern int _ZN8Particle6System3NewEjj5Fix12IiES2_S2_PK11Vector3_16fPNS_8CallbackE(u32 h, u32 id, s32 x, s32 y, s32 z, void* v, void* cb);
 extern u32 _ZN5Sound8PlayLongEjjjRK7Vector3s(u32 h, u32 a, u32 b, void* v, u32 d);
 extern void _ZN5Sound9PlayBank0EjRK7Vector3(u32 a, void* v);
 extern void func_ov002_020dc174(char* c, void* p, int a, int b, u32 e, u32 f);
